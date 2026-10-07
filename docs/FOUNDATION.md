@@ -33,10 +33,10 @@ All wellness reads and mutations include the current account id. A record UUID
 alone cannot grant access to another account's entry. Table names are fixed;
 record values are parameterized. Password hashes never appear in wellness exports.
 
-Schema version 1 records the original layout. Existing unversioned Compass
+Schema version 1 records the original layout; version 2 adds optional emotions,
+context tags, needs and activity completion to check-ins. Existing unversioned Compass
 databases are adopted without replacing records. Initialization is repeatable.
-An older app refuses a database marked with a newer schema version. No data
-transformation is needed for this baseline; future schema changes require new,
+An older app refuses a database marked with a newer schema version. New columns receive empty defaults and earlier records are preserved; future schema changes require new,
 ordered migration steps and a tested backup/restore procedure.
 
 ## Account and session behavior

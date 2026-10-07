@@ -147,3 +147,10 @@ Configuration validation, idle session expiry and schema version tracking are
 implemented. See [FOUNDATION.md](FOUNDATION.md) for the database design and
 current authentication boundaries. Registration and login are also tested
 through the actual Streamlit forms.
+
+## Stage 2 update
+
+Today now includes optional emotion/context tags, a needs prompt, rating anchors
+and an activity completion checkbox. One save records the whole check-in.
+Schema version 2 adds these fields with empty defaults and preserves all earlier
+records. Weekly AI context includes these fields after the existing consent step.

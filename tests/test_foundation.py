@@ -48,13 +48,13 @@ def test_initialization_preserves_legacy_records(users):
     with first.db.connect() as conn:
         assert conn.execute(
             "SELECT version FROM schema_migrations"
-        ).fetchall() == [(1,)]
+        ).fetchall() == [(1,), (2,)]
 
 
 def test_newer_schema_requires_newer_app(db):
     """An older app refuses a newer database version."""
     with db.connect() as conn:
-        conn.execute("INSERT INTO schema_migrations (version) VALUES (2)")
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (3)")
     with pytest.raises(ValueError, match="newer version"):
         db.initialize()
 
@@ -79,3 +79,51 @@ def test_login_replaces_previous_state():
     assert state["user_id"] == "bob"
     assert "draft" not in state
     assert "last_activity" in state
+
+
+def test_version_one_upgrade_keeps_checkin(users):
+    """Upgrade an original check-in without losing its ratings or note."""
+    first, _ = users
+    first.save_checkin("2026-10-06", 7, 6, 4, 8, "Keep this")
+    with first.db.connect() as conn:
+        for column in ("emotions", "contexts", "needs", "activity_done"):
+            conn.execute(f"ALTER TABLE checkins DROP COLUMN {column}")
+        conn.execute("DELETE FROM schema_migrations WHERE version = 2")
+    first.db.initialize()
+    first.db.initialize()
+    row = first.rows("checkins")[0]
+    assert row["mood"] == 7
+    assert row["note"] == "Keep this"
+    assert row["emotions"] == "[]"
+    assert row["needs"] == ""
+    assert row["activity_done"] == 0
+
+
+def test_checkin_context_upsert_and_export(users):
+    """Optional fields persist, update and stay within the owner's data."""
+    import json
+
+    first, second = users
+    first.save_checkin(
+        "2026-10-06",
+        7,
+        6,
+        4,
+        8,
+        "Note",
+        emotions=["Calm"],
+        contexts=["Work"],
+        needs="Rest",
+        activity_done=True,
+    )
+    row = json.loads(first.export())["checkins"][0]
+    assert json.loads(row["emotions"]) == ["Calm"]
+    assert row["activity_done"] == 1
+    assert second.rows("checkins") == []
+    first.save_checkin("2026-10-06", 7, 6, 4, 8, "Note")
+    assert first.rows("checkins")[0]["activity_done"] == 0
+    assert first.rows("checkins")[0]["needs"] == ""
+    with pytest.raises(ValueError):
+        first.save_checkin(
+            "2026-10-06", 7, 6, 4, 8, "", emotions=["Not an emotion"]
+        )

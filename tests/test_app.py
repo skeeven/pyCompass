@@ -88,3 +88,24 @@ def test_checkin_journal_navigation_and_logout(monkeypatch, users):
     ).click().run()
     assert not app.exception
     assert "user_id" not in app.session_state
+
+
+def test_optional_checkin_fields_survive_reload(monkeypatch, users):
+    """Optional form inputs return after restarting the app session."""
+    first, _ = users
+    app = open_app(monkeypatch, first.db)
+    app.session_state["user_id"] = first.user_id
+    app.run()
+    app.multiselect[0].set_value(["Calm", "Hopeful"])
+    app.multiselect[1].set_value(["Personal time"])
+    app.text_area[1].set_value("A little rest")
+    app.checkbox[0].check()
+    app.button(key="FormSubmitter:checkin-Save today's check-in").click().run()
+    assert not app.exception
+    reloaded = open_app(monkeypatch, first.db)
+    reloaded.session_state["user_id"] = first.user_id
+    reloaded.run()
+    assert not reloaded.exception
+    assert reloaded.multiselect[0].value == ["Calm", "Hopeful"]
+    assert reloaded.text_area[1].value == "A little rest"
+    assert reloaded.checkbox[0].value

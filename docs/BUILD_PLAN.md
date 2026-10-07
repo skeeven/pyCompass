@@ -173,3 +173,13 @@ retrying a failed database save does not repeat the API request when context
 is unchanged. Successful saves clear the draft. No schema change is required.
 Provider calls remain mocked in automated tests; live model quality, refusal,
 billing and outage behavior still need validation in the deployed app.
+
+## Stage 5 update
+
+Trends support 7/30/90-day windows ending on a selected date, recorded-day
+coverage and comparisons against the immediately preceding equal-length
+period. Missing days are never imputed; missing periods have no delta.
+Daily points are the default, with optional trend lines and rating selection.
+A table shows the measured ratings and sleep. AI observations retain their
+separate seven-day context ending today. No schema migration is required.
+The user confirmed the deployed Stage 4 companion sent and returned a reply.

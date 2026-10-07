@@ -183,3 +183,24 @@ Daily points are the default, with optional trend lines and rating selection.
 A table shows the measured ratings and sleep. AI observations retain their
 separate seven-day context ending today. No schema migration is required.
 The user confirmed the deployed Stage 4 companion sent and returned a reply.
+
+## Stage 6 update
+
+The user confirmed the deployed weekly reflection check was satisfactory.
+Local date-window and screen checks also pass. Provider outage, refusal and
+billing-failure cases remain separate release checks.
+
+## Stage 7 update
+
+New observations retain the exact bounded context used to generate them,
+including the source period, alongside the suggestion in the existing content
+field. A source expander lets users inspect that snapshot. It is generation
+context, not a claim that every entry supports the suggestion. Later source
+edits or deletions do not change the snapshot; deleting an observation removes
+its snapshot. Earlier plain-text observations remain readable and explicitly
+have no historical context available.
+Review includes Pending/Approved/Dismissed/All views and a Review again action.
+Deletion requires confirmation. All reads and review/deletion operations remain
+account scoped. No schema migration or added dependency is needed. Suggested
+patterns remain tentative; automatic validation of model citations and
+longitudinal pattern detection are future work.

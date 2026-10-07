@@ -12,6 +12,7 @@ from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
 from compass.journal import filter_entries
+from compass.observations import read_observation, save_observation
 from compass.reflection import (
     PROMPTS,
     ReflectionService,
@@ -171,7 +172,12 @@ def run_reflection(context, kind):
     try:
         with st.spinner("Making space for reflection…"):
             result = ai.review(context, observation=kind == "observation")
-        repo.add_insight(result, kind)
+        content = (
+            save_observation(result, context)
+            if kind == "observation"
+            else result
+        )
+        repo.add_insight(content, kind)
         st.success("Saved for your review.")
         st.markdown(result)
     except Exception:
@@ -534,7 +540,8 @@ elif page == "Insights":
         "seven days. Sends check-in ratings and notes, plus up to 20 "
         "journal entries (first 2,000 characters each). Check-in "
         "context includes emotion tags, context tags, needs "
-        "and activity completion.",
+        "and activity completion. The bounded context is saved with the "
+        "observation so you can review its evidence later.",
     )
     with st.expander("Preview the context to be sent"):
         st.json(context)
@@ -548,19 +555,65 @@ elif page == "Insights":
     ):
         run_reflection(context, "observation")
     st.subheader("Your observations")
-    for row in reversed(repo.rows("insights")):
-        if row["kind"] != "observation" or row["status"] == "dismissed":
-            continue
+    review_status = st.selectbox(
+        "Show observations",
+        ["Pending", "Approved", "Dismissed", "All"],
+        index=3,
+        key="observation_status",
+    )
+    observations = [
+        row
+        for row in reversed(repo.rows("insights"))
+        if row["kind"] == "observation"
+        and (review_status == "All" or row["status"] == review_status.lower())
+    ]
+    if not observations:
+        st.info("No observations in this view yet.")
+    for row in observations:
         with st.container(border=True):
-            st.markdown(row["content"])
+            text, evidence = read_observation(row["content"])
+            st.markdown(text)
             st.caption(f"{row['status'].title()} · {row['created_at'][:10]}")
-            left, right = st.columns(2)
+            if evidence is not None:
+                st.caption(
+                    f"Source period: {evidence['start']} to "
+                    f"{evidence['end']}. An observation is a suggestion "
+                    "to consider, not a proven cause."
+                )
+                with st.expander("Context used for this observation"):
+                    st.caption(
+                        "This is the saved context sent for this suggestion, "
+                        "not a claim that every entry supports it. Later "
+                        "edits or deletions of source entries do not change "
+                        "this snapshot. Delete the observation to remove it."
+                    )
+                    st.json(evidence)
+            else:
+                st.caption(
+                    "This earlier observation has no saved source context."
+                )
+            left, middle, right = st.columns(3)
             if left.button("This fits", key=f"approve_{row['id']}"):
                 repo.review_insight(row["id"], "approved")
                 st.rerun()
-            if right.button("Dismiss", key=f"dismiss_{row['id']}"):
+            if middle.button("Dismiss", key=f"dismiss_{row['id']}"):
                 repo.review_insight(row["id"], "dismissed")
                 st.rerun()
+            if right.button("Review again", key=f"reset_{row['id']}"):
+                repo.review_insight(row["id"], "pending")
+                st.rerun()
+            with st.expander("Remove this observation"):
+                confirmed = st.checkbox(
+                    "Delete this observation and its saved context",
+                    key=f"confirm_observation_{row['id']}",
+                )
+                if st.button(
+                    "Delete observation",
+                    key=f"delete_observation_{row['id']}",
+                    disabled=not confirmed,
+                ):
+                    repo.delete("insights", row["id"])
+                    st.rerun()
 
 elif page == "Weekly reflection":
     st.title("A moment to look back")

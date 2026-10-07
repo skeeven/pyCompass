@@ -145,3 +145,26 @@ def test_table_allowlist(users):
         users[0].rows("users")
     with pytest.raises(ValueError):
         users[0].delete("journal; DROP TABLE users", "123")
+
+
+def test_chat_preview_matches_request_and_rejects_empty():
+    """Preview and API use identical bounded text without record metadata."""
+    from compass.reflection import chat_context
+
+    client = Mock()
+    client.responses.create.return_value = SimpleNamespace(output_text="Reply")
+    service = ReflectionService(Settings(), client)
+    history = [
+        {"role": "user", "content": "x" * 4000, "user_id": "private"}
+        for _ in range(16)
+    ]
+    expected = chat_context(history, "  Hello  ")
+    service.chat(history, "  Hello  ")
+    sent = json.loads(client.responses.create.call_args.kwargs["input"])
+    assert sent == expected
+    assert len(sent) == 13
+    assert len(sent[0]["content"]) == 3000
+    assert sent[-1]["content"] == "Hello"
+    with pytest.raises(ValueError, match="Write a message"):
+        service.chat(history, "  ")
+    assert client.responses.create.call_count == 1

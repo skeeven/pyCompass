@@ -142,3 +142,46 @@ def test_guided_journal_validation_edit_and_delete(monkeypatch, users):
     app.button(key=f"delete_{row['id']}").click().run()
     assert not app.exception
     assert not first.rows("journal")
+
+
+def test_companion_consent_failure_and_retry(monkeypatch, users):
+    """Consent gates sending; a failed save reuses the received reply."""
+    from unittest.mock import Mock
+
+    from compass.reflection import ReflectionService
+    from compass.repository import Repository
+
+    first, second = users
+    second.add_exchange("Someone else's question", "Private reply")
+    app = open_app(monkeypatch, first.db)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-a-real-credential")
+    chat = Mock(side_effect=[RuntimeError("provider unavailable"), "A reply"])
+    monkeypatch.setattr(ReflectionService, "chat", chat)
+    app.session_state["user_id"] = first.user_id
+    app.run()
+    app.radio[0].set_value("Companion").run()
+    app.text_area(key="companion_draft").set_value("Help me reflect").run()
+    assert app.button(key="companion_send").disabled
+    assert not chat.called
+    app.checkbox(key="chat_consent").check().run()
+    app.button(key="companion_send").click().run()
+    assert app.error
+    assert app.text_area(key="companion_draft").value == "Help me reflect"
+    assert not first.rows("messages")
+    original = Repository.add_exchange
+    save = Mock(side_effect=RuntimeError("database unavailable"))
+    monkeypatch.setattr(Repository, "add_exchange", save)
+    app.button(key="companion_send").click().run()
+    assert app.error
+    assert chat.call_count == 2
+    assert chat.call_args.args[0] == []
+    monkeypatch.setattr(Repository, "add_exchange", original)
+    app.checkbox(key="chat_consent").uncheck().run()
+    assert app.button(key="companion_send").disabled
+    app.checkbox(key="chat_consent").check().run()
+    app.button(key="companion_send").click().run()
+    assert not app.exception
+    assert chat.call_count == 2
+    assert len(first.rows("messages")) == 2
+    assert app.text_area(key="companion_draft").value == ""
+    assert len(second.rows("messages")) == 2

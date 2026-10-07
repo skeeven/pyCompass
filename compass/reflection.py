@@ -114,6 +114,18 @@ def local_summary(context):
     )
 
 
+def chat_context(history, message):
+    """Build the exact bounded chat payload for preview and transmission."""
+    if not message.strip():
+        raise ValueError("Write a message before sending.")
+    context = [
+        {"role": row["role"], "content": row["content"][:3000]}
+        for row in history[-12:]
+    ]
+    context.append({"role": "user", "content": message.strip()[:3000]})
+    return context
+
+
 class ReflectionService:
     """Send only context chosen for the requested feature."""
 
@@ -147,12 +159,10 @@ class ReflectionService:
 
     def chat(self, history, message):
         """Use at most 12 previous chat messages; do not include journals."""
-        context = [
-            {"role": row["role"], "content": row["content"][:3000]}
-            for row in history[-12:]
-        ]
-        context.append({"role": "user", "content": message[:3000]})
-        return self.generate("Respond to the latest user message.", context)
+        return self.generate(
+            "Respond to the latest user message.",
+            chat_context(history, message),
+        )
 
     def review(self, context, observation=False):
         """Generate a weekly reflection or an evidence-grounded suggestion."""

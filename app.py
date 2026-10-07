@@ -37,6 +37,14 @@ st.markdown(
     .block-container {max-width: 850px; padding-top: 2rem;}
     div[data-testid="stMetric"] {background: #eaf3ef; padding: 1rem;
       border-radius: 12px;}
+    @media (max-width: 640px) {
+      .block-container {padding: 1rem 1rem 3rem;}
+      h1 {font-size: 1.8rem; overflow-wrap: anywhere;}
+      div[data-testid="stButton"] button {width: 100%; min-height: 44px;}
+      div[data-testid="stDownloadButton"] button {
+        width: 100%; min-height: 44px;
+      }
+    }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -642,7 +650,15 @@ elif page == "Weekly reflection":
         if row["kind"] == "weekly":
             with st.expander(f"Reflection · {row['created_at'][:10]}"):
                 st.markdown(row["content"])
-                if st.button("Delete reflection", key=f"week_{row['id']}"):
+                confirmed = st.checkbox(
+                    "Delete this saved reflection",
+                    key=f"confirm_week_{row['id']}",
+                )
+                if st.button(
+                    "Delete reflection",
+                    key=f"week_{row['id']}",
+                    disabled=not confirmed,
+                ):
                     repo.delete("insights", row["id"])
                     st.rerun()
 

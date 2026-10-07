@@ -204,3 +204,15 @@ Deletion requires confirmation. All reads and review/deletion operations remain
 account scoped. No schema migration or added dependency is needed. Suggested
 patterns remain tentative; automatic validation of model citations and
 longitudinal pattern detection are future work.
+
+## Stage 8 update
+
+The user confirmed Stage 7 looks good in the deployed app. Stage 8 adds
+mobile spacing and touch-sized action buttons, plus explicit confirmation
+before deleting a weekly reflection. Release tests cover cloud connection
+failure without local fallback and adapter commit/rollback/close behavior.
+The cloud driver is mocked; this does not claim a live cloud verification.
+See [RELEASE_CHECKS.md](RELEASE_CHECKS.md) for confirmed checks, the remaining
+phone/persistence/restart/export checks, and operational release limitations.
+No schema migration is needed. Stage 8 remains in progress until live checks
+are completed; public multi-user hardening is still a separate phase.

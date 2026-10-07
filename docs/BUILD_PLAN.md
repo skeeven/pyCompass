@@ -154,3 +154,12 @@ Today now includes optional emotion/context tags, a needs prompt, rating anchors
 and an activity completion checkbox. One save records the whole check-in.
 Schema version 2 adds these fields with empty defaults and preserves all earlier
 records. Weekly AI context includes these fields after the existing consent step.
+
+## Stage 3 update
+
+Journal drafts now clear only after a successful save. Guided prompts can be
+skipped, and saved tags are trimmed and deduplicated. History includes text
+search, local date windows, tag filters and a matching entry count. Users can
+edit their own entries while preserving original timestamps. Deletion requires
+a confirmation checkbox. These changes use the existing schema version 2.
+Drafts remain session-only and are cleared on sign-out or session expiry.

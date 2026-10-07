@@ -34,7 +34,8 @@ The first run creates `data/compass.db` automatically.
 - Daily mood, energy, stress and sleep check-ins, with optional emotions,
   context tags, needs and daily activity completion.
 - Free writing and three guided journal formats.
-- Searchable journal history with deletion.
+- Searchable journal history with date/tag filters, editing and confirmed
+  deletion.
 - Optional AI companion and saved conversations.
 - Mood, energy and stress trends over 7, 30 or 90 days.
 - On-demand weekly reflection, with a local summary when AI is off.

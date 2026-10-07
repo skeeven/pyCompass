@@ -109,3 +109,36 @@ def test_optional_checkin_fields_survive_reload(monkeypatch, users):
     assert reloaded.multiselect[0].value == ["Calm", "Hopeful"]
     assert reloaded.text_area[1].value == "A little rest"
     assert reloaded.checkbox[0].value
+
+
+def test_guided_journal_validation_edit_and_delete(monkeypatch, users):
+    """A draft survives rejection; saved entries can be edited and removed."""
+    first, _ = users
+    app = open_app(monkeypatch, first.db)
+    app.session_state["user_id"] = first.user_id
+    app.run()
+    app.radio[0].set_value("Journal").run()
+    app.selectbox[0].set_value("Understand a reaction").run()
+    app.text_input(key="journal_title").set_value("My reaction")
+    app.button(key="FormSubmitter:journal-Save entry").click().run()
+    assert app.error
+    assert app.text_input(key="journal_title").value == "My reaction"
+    app.text_area[0].set_value("A busy afternoon")
+    app.button(key="FormSubmitter:journal-Save entry").click().run()
+    assert not app.exception
+    row = first.rows("journal")[0]
+    assert (
+        row["body"] == "What happened? Describe what you observed.\n"
+        "A busy afternoon"
+    )
+    app.text_area[-1].set_value("I need some rest.")
+    app.button(
+        key=f"FormSubmitter:edit_journal_{row['id']}-Save changes"
+    ).click().run()
+    assert not app.exception
+    assert first.rows("journal")[0]["body"] == "I need some rest."
+    assert app.button(key=f"delete_{row['id']}").disabled
+    app.checkbox(key=f"confirm_{row['id']}").check().run()
+    app.button(key=f"delete_{row['id']}").click().run()
+    assert not app.exception
+    assert not first.rows("journal")

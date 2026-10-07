@@ -11,6 +11,7 @@ from compass.auth import AuthService
 from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
+from compass.journal import filter_entries
 from compass.reflection import (
     PROMPTS,
     ReflectionService,
@@ -251,12 +252,24 @@ if page == "Today":
 
 elif page == "Journal":
     st.title("Your journal")
+    st.write("Write freely or choose a few prompts. Skip any prompt you like.")
     mode = st.selectbox("Writing style", ["Free writing", *PROMPTS])
-    with st.form("journal", clear_on_submit=True):
-        title = st.text_input("Title", max_chars=120)
+    if st.session_state.pop("journal_saved", False):
+        st.success("Your entry is saved.")
+    for key in st.session_state.pop("journal_clear_keys", []):
+        st.session_state.pop(key, None)
+    draft_keys = ["journal_title", "journal_tags", "journal_body"]
+    draft_keys += [
+        f"answer_{mode}_{i}" for i in range(len(PROMPTS.get(mode, [])))
+    ]
+    with st.form("journal"):
+        title = st.text_input("Title", max_chars=120, key="journal_title")
         if mode == "Free writing":
             body = st.text_area(
-                "Start wherever you are", height=230, max_chars=12000
+                "Start wherever you are",
+                height=230,
+                max_chars=12000,
+                key="journal_body",
             )
         else:
             answers = [
@@ -268,32 +281,93 @@ elif page == "Journal":
                 for prompt, answer in zip(PROMPTS[mode], answers)
                 if answer.strip()
             )
-        tags = st.text_input("Tags (comma separated)", max_chars=300)
+        tags = st.text_input(
+            "Tags (comma separated)", max_chars=300, key="journal_tags"
+        )
         if st.form_submit_button("Save entry", type="primary"):
             try:
-                repo.add_journal(title or mode, body, tags)
-                st.success("Your entry is saved.")
+                repo.add_journal(title.strip() or mode, body, tags)
+                st.session_state["journal_clear_keys"] = draft_keys
+                st.session_state["journal_saved"] = True
+                st.rerun()
             except ValueError as exc:
                 st.error(str(exc))
+            except Exception:
+                st.error(
+                    "Could not save. Your draft is still here. Try again."
+                )
+    st.caption("Drafts last for this session. Save before signing out.")
     st.subheader("Past entries")
-    query = st.text_input("Search your journal").lower().strip()
-    entries = [
-        row
-        for row in reversed(repo.rows("journal"))
-        if query in (row["title"] + row["body"] + row["tags"]).lower()
-    ]
-    if not entries:
-        st.caption("No entries match yet.")
+    all_entries = repo.rows("journal")
+    query = st.text_input("Search your journal", key="journal_search")
+    window = st.selectbox(
+        "Entry dates",
+        ["All time", "Last 7 days", "Last 30 days", "Last 90 days"],
+    )
+    tag_options = sorted(
+        {
+            tag.strip()
+            for row in all_entries
+            for tag in row["tags"].split(",")
+            if tag.strip()
+        },
+        key=str.casefold,
+    )
+    selected_tags = st.multiselect("Filter by tags", tag_options)
+    days = {
+        "All time": None,
+        "Last 7 days": 7,
+        "Last 30 days": 30,
+        "Last 90 days": 90,
+    }[window]
+    entries = filter_entries(
+        all_entries, query, selected_tags, days, today, settings.timezone
+    )
+    st.caption(f"Showing {len(entries)} of {len(all_entries)} entries.")
+    if not all_entries:
+        st.info("Your first saved entry will appear here.")
+    elif not entries:
+        st.info("No entries match. Try changing your search or filters.")
     for row in entries:
         local_date = (
             datetime.fromisoformat(row["created_at"])
             .astimezone(ZoneInfo(settings.timezone))
-            .strftime("%b %d, %Y")
+            .strftime("%b %d, %Y · %I:%M %p")
         )
         with st.expander(f"{local_date} · {row['title']}"):
             st.text(row["body"])
-            st.caption(row["tags"])
-            if st.button("Delete entry", key=f"delete_{row['id']}"):
+            if row["tags"]:
+                st.caption(row["tags"])
+            st.caption("Edit this entry")
+            with st.form(f"edit_journal_{row['id']}"):
+                edit_title = st.text_input(
+                    "Title", row["title"], max_chars=120
+                )
+                edit_body = st.text_area(
+                    "Entry", row["body"], height=230, max_chars=12000
+                )
+                edit_tags = st.text_input(
+                    "Tags (comma separated)", row["tags"], max_chars=300
+                )
+                if st.form_submit_button("Save changes"):
+                    try:
+                        repo.update_journal(
+                            row["id"], edit_title, edit_body, edit_tags
+                        )
+                        st.session_state["journal_saved"] = True
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+                    except Exception:
+                        st.error("Could not update. Try again.")
+            confirmed = st.checkbox(
+                "Confirm deletion of this entry", key=f"confirm_{row['id']}"
+            )
+            if st.button(
+                "Delete entry",
+                key=f"delete_{row['id']}",
+                disabled=not confirmed,
+            ):
                 repo.delete("journal", row["id"])
                 st.rerun()
 

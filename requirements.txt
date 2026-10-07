@@ -1,0 +1,5 @@
+streamlit>=1.65,<2
+pandas>=2.2,<3
+openai>=1.75,<4
+sqlitecloud>=0.0.84,<1
+tzdata>=2025.1

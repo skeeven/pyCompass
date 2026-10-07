@@ -1,0 +1,405 @@
+"""Run pyCompass with: streamlit run app.py."""
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+import streamlit as st
+
+from compass.auth import AuthService
+from compass.config import Settings
+from compass.db import Database
+from compass.reflection import (
+    PROMPTS,
+    ReflectionService,
+    activity,
+    local_summary,
+    weekly_context,
+)
+from compass.repository import Repository
+from compass.session import check_session, start_session
+
+st.set_page_config(
+    page_title="Compass · Find your direction",
+    page_icon="🧭",
+    layout="centered",
+)
+st.markdown(
+    """<style>
+    .stApp {background: #f7faf8;}
+    h1, h2, h3 {color: #214e43;}
+    .block-container {max-width: 850px; padding-top: 2rem;}
+    div[data-testid="stMetric"] {background: #eaf3ef; padding: 1rem;
+      border-radius: 12px;}
+    </style>""",
+    unsafe_allow_html=True,
+)
+try:
+    secrets = dict(st.secrets)
+except FileNotFoundError:
+    secrets = {}
+except Exception:
+    st.error("Cannot read secrets.toml. Check its TOML formatting.")
+    st.stop()
+try:
+    settings = Settings.load(secrets)
+except ValueError as exc:
+    st.error(str(exc))
+    st.stop()
+db = Database(settings)
+try:
+    db.initialize()
+except ValueError as exc:
+    st.error(str(exc))
+    st.stop()
+except Exception:
+    st.error("Cannot open the database. Check your configuration.")
+    st.stop()
+auth = AuthService(db)
+try:
+    today = datetime.now(ZoneInfo(settings.timezone)).date()
+except (ValueError, KeyError):
+    st.error("APP_TIMEZONE must be a valid name, such as America/Denver.")
+    st.stop()
+
+
+def logout():
+    """Clear the entire session to prevent data leaking between accounts."""
+    st.session_state.clear()
+    st.rerun()
+
+
+def sign_in():
+    """Present login and optional self-service registration."""
+    st.title("🧭 Compass")
+    st.write("A little space to understand yourself and find your direction.")
+    tabs = st.tabs(
+        ["Sign in", "Create account"]
+        if settings.allow_registration
+        else ["Sign in"]
+    )
+    with tabs[0], st.form("login"):
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input(
+            "Password", type="password", key="login_password"
+        )
+        if st.form_submit_button("Sign in", type="primary"):
+            try:
+                user_id = auth.login(username, password)
+            except Exception:
+                st.error("Sign-in is unavailable. Please try again later.")
+                st.stop()
+            if user_id:
+                start_session(st.session_state, user_id)
+                st.rerun()
+            st.error(
+                "Sign-in failed. Check your credentials or wait five "
+                "minutes if you have made repeated attempts."
+            )
+    if settings.allow_registration:
+        with tabs[1], st.form("register", clear_on_submit=True):
+            username = st.text_input("Choose a username")
+            password = st.text_input("Choose a password", type="password")
+            confirm = st.text_input("Confirm password", type="password")
+            st.caption("Use 12+ characters. No email address is required.")
+            if st.form_submit_button("Create account"):
+                if password != confirm:
+                    st.error("Your passwords do not match.")
+                else:
+                    try:
+                        auth.register(username, password)
+                        st.success("Account created. You can now sign in.")
+                    except ValueError as exc:
+                        st.error(str(exc))
+                    except Exception:
+                        st.error("Account creation failed. Please try again.")
+    st.caption(
+        "A personal wellness tool. No one monitors your entries. "
+        "It does not provide diagnosis or treatment."
+    )
+
+
+had_session = "user_id" in st.session_state
+if not check_session(st.session_state, settings.session_timeout_minutes):
+    if had_session:
+        st.info("Your session expired. Please sign in again.")
+    sign_in()
+    st.stop()
+try:
+    repo = Repository(db, st.session_state["user_id"])
+except ValueError:
+    logout()
+ai = ReflectionService(settings)
+
+with st.sidebar:
+    st.title("🧭 Compass")
+    page = st.radio(
+        "Your space",
+        [
+            "Today",
+            "Journal",
+            "Companion",
+            "Insights",
+            "Weekly reflection",
+            "Privacy & data",
+        ],
+    )
+    st.caption("Pause. Notice. Choose a small next step.")
+    if st.button("Sign out"):
+        logout()
+    with st.expander("Need urgent support?"):
+        st.write(
+            "If you are in immediate danger, contact local emergency "
+            "services. In the U.S., call or text 988 for crisis support. "
+            "This app is not monitored."
+        )
+
+
+def ai_consent(key, description):
+    """Require consent on the feature screen before each AI action."""
+    st.caption(description)
+    return st.checkbox("I agree to send this context to OpenAI", key=key)
+
+
+def run_reflection(context, kind):
+    """Handle provider failures without exposing secrets or journal data."""
+    try:
+        with st.spinner("Making space for reflection…"):
+            result = ai.review(context, observation=kind == "observation")
+        repo.add_insight(result, kind)
+        st.success("Saved for your review.")
+        st.markdown(result)
+    except Exception:
+        st.error(
+            "Reflection could not be completed. Check your API key, model, "
+            "and billing, or try again later. Your entries are still saved."
+        )
+
+
+if page == "Today":
+    st.title("How are you arriving today?")
+    st.caption(today.strftime("%A, %B %d, %Y"))
+    existing = next(
+        (
+            row
+            for row in repo.rows("checkins")
+            if row["day"] == today.isoformat()
+        ),
+        {},
+    )
+    with st.form("checkin"):
+        mood = st.slider("Mood · low to high", 1, 10, existing.get("mood", 5))
+        energy = st.slider("Energy", 1, 10, existing.get("energy", 5))
+        stress = st.slider("Stress", 1, 10, existing.get("stress", 5))
+        sleep = st.number_input(
+            "Hours of sleep",
+            0.0,
+            24.0,
+            float(existing.get("sleep", 7.0)),
+            0.5,
+        )
+        note = st.text_area(
+            "What is on your mind?",
+            existing.get("note", ""),
+            max_chars=2000,
+        )
+        if st.form_submit_button("Save today's check-in", type="primary"):
+            repo.save_checkin(
+                today.isoformat(), mood, energy, stress, sleep, note
+            )
+            st.success("Saved. You can update today's check-in anytime.")
+    st.subheader("One small thing")
+    st.info(activity(today))
+    st.write("What do you need a little more of today?")
+
+elif page == "Journal":
+    st.title("Your journal")
+    mode = st.selectbox("Writing style", ["Free writing", *PROMPTS])
+    with st.form("journal", clear_on_submit=True):
+        title = st.text_input("Title", max_chars=120)
+        if mode == "Free writing":
+            body = st.text_area(
+                "Start wherever you are", height=230, max_chars=12000
+            )
+        else:
+            answers = [
+                st.text_area(prompt, key=f"answer_{mode}_{i}", max_chars=3500)
+                for i, prompt in enumerate(PROMPTS[mode])
+            ]
+            body = "\n\n".join(
+                f"{prompt}\n{answer}"
+                for prompt, answer in zip(PROMPTS[mode], answers)
+                if answer.strip()
+            )
+        tags = st.text_input("Tags (comma separated)", max_chars=300)
+        if st.form_submit_button("Save entry", type="primary"):
+            try:
+                repo.add_journal(title or mode, body, tags)
+                st.success("Your entry is saved.")
+            except ValueError as exc:
+                st.error(str(exc))
+    st.subheader("Past entries")
+    query = st.text_input("Search your journal").lower().strip()
+    entries = [
+        row
+        for row in reversed(repo.rows("journal"))
+        if query in (row["title"] + row["body"] + row["tags"]).lower()
+    ]
+    if not entries:
+        st.caption("No entries match yet.")
+    for row in entries:
+        local_date = (
+            datetime.fromisoformat(row["created_at"])
+            .astimezone(ZoneInfo(settings.timezone))
+            .strftime("%b %d, %Y")
+        )
+        with st.expander(f"{local_date} · {row['title']}"):
+            st.text(row["body"])
+            st.caption(row["tags"])
+            if st.button("Delete entry", key=f"delete_{row['id']}"):
+                repo.delete("journal", row["id"])
+                st.rerun()
+
+elif page == "Companion":
+    st.title("Talk it through")
+    st.write("A reflective conversation, one question at a time.")
+    if not settings.openai_api_key:
+        st.info("Add OPENAI_API_KEY to enable the companion.")
+    consent = ai_consent(
+        "chat_consent",
+        "Each message sends your new text and up to 12 "
+        "previous chat messages. Journal entries are not included. "
+        "API use incurs charges on your OpenAI account.",
+    )
+    history = repo.rows("messages")
+    for row in history[-40:]:
+        with st.chat_message(row["role"]):
+            st.markdown(row["content"])
+    text = st.chat_input(
+        "What would you like to explore?",
+        max_chars=3000,
+        disabled=not (consent and settings.openai_api_key),
+    )
+    if text:
+        try:
+            with st.spinner("Listening…"):
+                reply = ai.chat(history, text)
+            repo.add_exchange(text, reply)
+            st.rerun()
+        except Exception:
+            st.error("Message could not be sent. Please try again later.")
+
+elif page == "Insights":
+    st.title("What am I learning about myself?")
+    rows = repo.rows("checkins")
+    if rows:
+        days = st.selectbox("Chart window", [7, 30, 90], index=1)
+        frame = pd.DataFrame(rows)
+        frame["day"] = pd.to_datetime(frame["day"])
+        cutoff = pd.Timestamp(today) - pd.Timedelta(days=days - 1)
+        frame = frame[frame["day"] >= cutoff]
+        if not frame.empty:
+            cols = st.columns(3)
+            for col, key in zip(cols, ("mood", "energy", "stress")):
+                col.metric(key.title(), f"{frame[key].mean():.1f}/10")
+            st.line_chart(frame.set_index("day")[["mood", "energy", "stress"]])
+            st.caption("Missing days are not imputed. These are your ratings.")
+        else:
+            st.info("No check-ins in this date window.")
+    else:
+        st.info("Save a check-in to start seeing your trends.")
+    context = weekly_context(repo, today)
+    consent = ai_consent(
+        "insight_consent",
+        "Generate a tentative observation from the past "
+        "seven days. Sends check-in ratings and notes, plus up to 20 "
+        "journal entries (first 2,000 characters each).",
+    )
+    with st.expander("Preview the context to be sent"):
+        st.json(context)
+    if st.button(
+        "Suggest an observation",
+        disabled=not (
+            consent
+            and settings.openai_api_key
+            and (context["checkins"] or context["journal"])
+        ),
+    ):
+        run_reflection(context, "observation")
+    st.subheader("Your observations")
+    for row in reversed(repo.rows("insights")):
+        if row["kind"] != "observation" or row["status"] == "dismissed":
+            continue
+        with st.container(border=True):
+            st.markdown(row["content"])
+            st.caption(f"{row['status'].title()} · {row['created_at'][:10]}")
+            left, right = st.columns(2)
+            if left.button("This fits", key=f"approve_{row['id']}"):
+                repo.review_insight(row["id"], "approved")
+                st.rerun()
+            if right.button("Dismiss", key=f"dismiss_{row['id']}"):
+                repo.review_insight(row["id"], "dismissed")
+                st.rerun()
+
+elif page == "Weekly reflection":
+    st.title("A moment to look back")
+    end_day = st.date_input("Week ending", today, max_value=today)
+    context = weekly_context(repo, end_day)
+    st.write(local_summary(context))
+    consent = ai_consent(
+        "weekly_consent",
+        "An AI reflection sends this week's check-ins "
+        "and notes, plus up to 20 journal entries (first 2,000 characters "
+        "each). Chat history is not included.",
+    )
+    with st.expander("Preview the context to be sent"):
+        st.json(context)
+    if st.button(
+        "Generate weekly reflection",
+        disabled=not (
+            consent
+            and settings.openai_api_key
+            and (context["checkins"] or context["journal"])
+        ),
+    ):
+        run_reflection(context, "weekly")
+    for row in reversed(repo.rows("insights")):
+        if row["kind"] == "weekly":
+            with st.expander(f"Reflection · {row['created_at'][:10]}"):
+                st.markdown(row["content"])
+                if st.button("Delete reflection", key=f"week_{row['id']}"):
+                    repo.delete("insights", row["id"])
+                    st.rerun()
+
+elif page == "Privacy & data":
+    st.title("Your data, your choices")
+    st.write(
+        "With no cloud configuration, your records stay in the local "
+        "SQLite file. SQLiteCloud stores them remotely when configured. "
+        "Journal text is not encrypted by this app. Protect your computer "
+        "and backups, and control access to your database."
+    )
+    st.write(
+        "AI features send only the context described on each screen. "
+        "Requests set store=False, which disables stored API responses; "
+        "it does not guarantee zero provider retention. "
+        "Deleting records here does not delete database backups or "
+        "provider logs. No analytics or advertising SDK is included."
+    )
+    st.download_button(
+        "Export my data (JSON)",
+        repo.export(),
+        file_name="compass_export.json",
+        mime="application/json",
+    )
+    if st.checkbox("I want to clear my companion conversation"):
+        if st.button("Clear conversation"):
+            for row in repo.rows("messages"):
+                repo.delete("messages", row["id"])
+            st.rerun()
+    st.divider()
+    st.warning("Deleting your account permanently removes its app records.")
+    confirmation = st.text_input("Type DELETE to confirm account deletion")
+    if st.button("Delete my account", disabled=confirmation != "DELETE"):
+        repo.delete_account()
+        logout()

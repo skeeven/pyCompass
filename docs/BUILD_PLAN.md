@@ -163,3 +163,13 @@ search, local date windows, tag filters and a matching entry count. Users can
 edit their own entries while preserving original timestamps. Deletion requires
 a confirmation checkbox. These changes use the existing schema version 2.
 Drafts remain session-only and are cleared on sign-out or session expiry.
+
+## Stage 4 update
+
+The companion now previews its exact bounded chat context before sending.
+Consent and configured API access gate every send, including retries. Drafts
+survive provider/storage failures. A received reply is retained in session so
+retrying a failed database save does not repeat the API request when context
+is unchanged. Successful saves clear the draft. No schema change is required.
+Provider calls remain mocked in automated tests; live model quality, refusal,
+billing and outage behavior still need validation in the deployed app.

@@ -16,6 +16,7 @@ from compass.reflection import (
     PROMPTS,
     ReflectionService,
     activity,
+    chat_context,
     local_summary,
     weekly_context,
 )
@@ -386,19 +387,53 @@ elif page == "Companion":
     for row in history[-40:]:
         with st.chat_message(row["role"]):
             st.markdown(row["content"])
-    text = st.chat_input(
+    if st.session_state.pop("companion_clear_draft", False):
+        st.session_state.pop("companion_draft", None)
+    text = st.text_area(
         "What would you like to explore?",
         max_chars=3000,
-        disabled=not (consent and settings.openai_api_key),
+        key="companion_draft",
+        height=100,
     )
-    if text:
-        try:
-            with st.spinner("Listening…"):
-                reply = ai.chat(history, text)
-            repo.add_exchange(text, reply)
-            st.rerun()
-        except Exception:
-            st.error("Message could not be sent. Please try again later.")
+    with st.expander("Preview the context to be sent"):
+        if text.strip():
+            st.json(chat_context(history, text))
+        else:
+            st.caption("Write a message to preview its context.")
+    st.caption(
+        "Drafts last for this session. Only the last 12 chat messages "
+        "and your new message are sent; check-ins and journals are excluded."
+    )
+    if st.button(
+        "Send message",
+        type="primary",
+        key="companion_send",
+        disabled=not (consent and settings.openai_api_key and text.strip()),
+    ):
+        # Recheck consent at the action boundary, including retries.
+        if consent and settings.openai_api_key and text.strip():
+            try:
+                pending = st.session_state.get("companion_pending_reply")
+                payload = chat_context(history, text)
+                if pending and pending["context"] == payload:
+                    reply = pending["reply"]
+                else:
+                    with st.spinner("Listening…"):
+                        reply = ai.chat(history, text)
+                    st.session_state["companion_pending_reply"] = {
+                        "context": payload,
+                        "reply": reply,
+                    }
+                repo.add_exchange(text.strip(), reply)
+                st.session_state.pop("companion_pending_reply", None)
+                st.session_state["companion_clear_draft"] = True
+                st.rerun()
+            except Exception:
+                st.error(
+                    "Could not complete your message. Your draft is still "
+                    "here. Check API billing, model access or connection, "
+                    "then try Send message again."
+                )
 
 elif page == "Insights":
     st.title("What am I learning about myself?")

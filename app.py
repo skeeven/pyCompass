@@ -1,5 +1,6 @@
 """Run pyCompass with: streamlit run app.py."""
 
+import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -7,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from compass.auth import AuthService
+from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
 from compass.reflection import (
@@ -187,9 +189,15 @@ if page == "Today":
         ),
         {},
     )
+    st.write("Start with the ratings. Everything else is optional.")
+    if existing:
+        st.caption("Today's check-in is saved. You can update it below.")
     with st.form("checkin"):
+        st.caption("1 = very low mood · 10 = very good mood")
         mood = st.slider("Mood · low to high", 1, 10, existing.get("mood", 5))
+        st.caption("1 = exhausted · 10 = energized")
         energy = st.slider("Energy", 1, 10, existing.get("energy", 5))
+        st.caption("1 = relaxed · 10 = extremely stressed")
         stress = st.slider("Stress", 1, 10, existing.get("stress", 5))
         sleep = st.number_input(
             "Hours of sleep",
@@ -203,14 +211,43 @@ if page == "Today":
             existing.get("note", ""),
             max_chars=2000,
         )
+        with st.expander("Add a little context (optional)"):
+            emotions = st.multiselect(
+                "What feelings are present?",
+                EMOTIONS,
+                default=json.loads(existing.get("emotions", "[]")),
+            )
+            contexts = st.multiselect(
+                "What is influencing today?",
+                CONTEXTS,
+                default=json.loads(existing.get("contexts", "[]")),
+            )
+            needs = st.text_area(
+                "What do I need today?",
+                existing.get("needs", ""),
+                placeholder="Rest, support, connection, space…",
+                max_chars=1000,
+            )
+        st.subheader("One small thing")
+        st.info(activity(today))
+        activity_done = st.checkbox(
+            "I completed today's activity",
+            value=bool(existing.get("activity_done", 0)),
+        )
         if st.form_submit_button("Save today's check-in", type="primary"):
             repo.save_checkin(
-                today.isoformat(), mood, energy, stress, sleep, note
+                today.isoformat(),
+                mood,
+                energy,
+                stress,
+                sleep,
+                note,
+                emotions=emotions,
+                contexts=contexts,
+                needs=needs,
+                activity_done=activity_done,
             )
             st.success("Saved. You can update today's check-in anytime.")
-    st.subheader("One small thing")
-    st.info(activity(today))
-    st.write("What do you need a little more of today?")
 
 elif page == "Journal":
     st.title("Your journal")
@@ -313,7 +350,9 @@ elif page == "Insights":
         "insight_consent",
         "Generate a tentative observation from the past "
         "seven days. Sends check-in ratings and notes, plus up to 20 "
-        "journal entries (first 2,000 characters each).",
+        "journal entries (first 2,000 characters each). Check-in "
+        "context includes emotion tags, context tags, needs "
+        "and activity completion.",
     )
     with st.expander("Preview the context to be sent"):
         st.json(context)
@@ -350,7 +389,8 @@ elif page == "Weekly reflection":
         "weekly_consent",
         "An AI reflection sends this week's check-ins "
         "and notes, plus up to 20 journal entries (first 2,000 characters "
-        "each). Chat history is not included.",
+        "each), including check-in tags, needs and activity completion. "
+        "Chat history is not included.",
     )
     with st.expander("Preview the context to be sent"):
         st.json(context)

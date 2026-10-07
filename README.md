@@ -31,7 +31,8 @@ The first run creates `data/compass.db` automatically.
 
 ## What's included
 
-- Daily mood, energy, stress and sleep check-ins.
+- Daily mood, energy, stress and sleep check-ins, with optional emotions,
+  context tags, needs and daily activity completion.
 - Free writing and three guided journal formats.
 - Searchable journal history with deletion.
 - Optional AI companion and saved conversations.
@@ -99,8 +100,8 @@ local data. Live cloud connectivity was not tested in this delivery.
 
 Chat sends the new message and up to 12 previous messages, not journal entries.
 Weekly reflection and observations send seven days of check-ins/notes and up
-to 20 journal entries, limited to 2,000 characters each. Those screens show an
-exact context preview. Requests limit output to 800 tokens.
+to 20 journal entries, limited to 2,000 characters each. Check-in context includes emotion/context tags, needs and activity completion.
+Those screens show an exact context preview. Requests limit output to 800 tokens.
 
 ChatGPT membership does not pay for this project's API use. Provider calls
 were mocked in tests; real model access, billing and response behavior remain
@@ -138,7 +139,7 @@ than locking all transitive dependencies.
 Use the initial app locally for personal testing. Before inviting other people
 or hosting it publicly, complete the release-hardening phase in the build plan.
 Use persistent database storage for a hosted app; ephemeral disks can lose the
-local SQLite file. The database tracks schema version 1 and preserves existing records.
+local SQLite file. The database tracks schema version 2 and preserves existing records.
 Future changes need explicit migrations. No automatic backup is included.
 
 Compass is a reflection tool, not therapy or diagnosis. No person monitors

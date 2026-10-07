@@ -4,6 +4,8 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from compass.journal import normalize_tags
+
 TABLES = {"checkins", "journal", "messages", "insights"}
 
 
@@ -107,9 +109,28 @@ class Repository:
                     now(),
                     title.strip()[:120],
                     body.strip()[:12000],
-                    tags[:300],
+                    normalize_tags(tags),
                 ),
             )
+
+    def update_journal(self, entry_id, title, body, tags):
+        """Update an owned entry while preserving its original timestamp."""
+        if not body.strip():
+            raise ValueError("Write something before saving.")
+        with self.db.connect() as conn:
+            cursor = conn.execute(
+                "UPDATE journal SET title = ?, body = ?, tags = ? "
+                "WHERE id = ? AND user_id = ?",
+                (
+                    title.strip()[:120] or "Journal entry",
+                    body.strip()[:12000],
+                    normalize_tags(tags),
+                    entry_id,
+                    self.user_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("This journal entry is unavailable.")
 
     def add_exchange(self, user_text, assistant_text):
         """Store a complete chat exchange in one transaction."""

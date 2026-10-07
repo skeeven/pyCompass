@@ -52,7 +52,7 @@ SCHEMA = (
     "CREATE INDEX IF NOT EXISTS messages_owner ON messages(user_id)",
     "CREATE INDEX IF NOT EXISTS insights_owner ON insights(user_id)",
 )
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class Database:
@@ -99,11 +99,31 @@ class Database:
                 raise ValueError(
                     "The database requires a newer version of Compass."
                 )
-            if version == SCHEMA_VERSION:
-                return
-            for statement in SCHEMA:
-                conn.execute(statement)
-            conn.execute(
-                "INSERT INTO schema_migrations (version) VALUES (?)",
-                (SCHEMA_VERSION,),
-            )
+            if version < 1:
+                for statement in SCHEMA:
+                    conn.execute(statement)
+                conn.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (1)"
+                )
+            if version < 2:
+                columns = {
+                    row[1]
+                    for row in conn.execute(
+                        "PRAGMA table_info(checkins)"
+                    ).fetchall()
+                }
+                additions = {
+                    "emotions": "TEXT NOT NULL DEFAULT '[]'",
+                    "contexts": "TEXT NOT NULL DEFAULT '[]'",
+                    "needs": "TEXT NOT NULL DEFAULT ''",
+                    "activity_done": "INTEGER NOT NULL DEFAULT 0",
+                }
+                for name, definition in additions.items():
+                    if name not in columns:
+                        conn.execute(
+                            f"ALTER TABLE checkins ADD COLUMN {name} "
+                            f"{definition}"
+                        )
+                conn.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (2)"
+                )

@@ -38,7 +38,20 @@ class Repository:
             names = [column[0] for column in cursor.description]
             return [dict(zip(names, row)) for row in cursor.fetchall()]
 
-    def save_checkin(self, day, mood, energy, stress, sleep, note):
+    def save_checkin(
+        self,
+        day,
+        mood,
+        energy,
+        stress,
+        sleep,
+        note,
+        *,
+        emotions=(),
+        contexts=(),
+        needs="",
+        activity_done=False,
+    ):
         """Save one check-in per day, replacing an earlier check-in."""
         from datetime import date
 
@@ -47,15 +60,24 @@ class Repository:
             raise ValueError("Ratings must be between 1 and 10.")
         if not 0 <= sleep <= 24:
             raise ValueError("Sleep must be between 0 and 24 hours.")
+        from compass.checkin import CONTEXTS, EMOTIONS
+
+        if any(tag not in EMOTIONS for tag in emotions):
+            raise ValueError("Unknown emotion tag.")
+        if any(tag not in CONTEXTS for tag in contexts):
+            raise ValueError("Unknown context tag.")
         with self.db.connect() as conn:
             conn.execute(
                 """INSERT INTO checkins
-                (id, user_id, day, mood, energy, stress, sleep, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, user_id, day, mood, energy, stress, sleep, note,
+                emotions, contexts, needs, activity_done)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, day) DO UPDATE SET
                 mood = excluded.mood, energy = excluded.energy,
                 stress = excluded.stress, sleep = excluded.sleep,
-                note = excluded.note""",
+                note = excluded.note, emotions = excluded.emotions,
+                contexts = excluded.contexts, needs = excluded.needs,
+                activity_done = excluded.activity_done""",
                 (
                     str(uuid4()),
                     self.user_id,
@@ -65,6 +87,10 @@ class Repository:
                     stress,
                     sleep,
                     note[:2000],
+                    json.dumps(list(dict.fromkeys(emotions))),
+                    json.dumps(list(dict.fromkeys(contexts))),
+                    needs.strip()[:1000],
+                    int(bool(activity_done)),
                 ),
             )
 

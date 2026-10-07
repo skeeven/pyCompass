@@ -53,7 +53,18 @@ def weekly_context(repo, end_day):
     checkins = [
         {
             key: row[key]
-            for key in ("day", "mood", "energy", "stress", "sleep", "note")
+            for key in (
+                "day",
+                "mood",
+                "energy",
+                "stress",
+                "sleep",
+                "note",
+                "emotions",
+                "contexts",
+                "needs",
+                "activity_done",
+            )
         }
         for row in repo.rows("checkins")
         if start.isoformat() <= row["day"] <= end_day.isoformat()

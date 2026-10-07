@@ -22,6 +22,7 @@ from compass.reflection import (
 )
 from compass.repository import Repository
 from compass.session import check_session, start_session
+from compass.trends import RATINGS, trend_summary
 
 st.set_page_config(
     page_title="Compass · Find your direction",
@@ -440,20 +441,92 @@ elif page == "Insights":
     rows = repo.rows("checkins")
     if rows:
         days = st.selectbox("Chart window", [7, 30, 90], index=1)
-        frame = pd.DataFrame(rows)
-        frame["day"] = pd.to_datetime(frame["day"])
-        cutoff = pd.Timestamp(today) - pd.Timedelta(days=days - 1)
-        frame = frame[frame["day"] >= cutoff]
-        if not frame.empty:
+        end_day = st.date_input(
+            "Period ending",
+            value=today,
+            max_value=today,
+            key="trend_end_day",
+        )
+        summary = trend_summary(rows, end_day, days)
+        st.caption(
+            f"{summary['start']:%b %d, %Y} – {end_day:%b %d, %Y} · "
+            f"{len(summary['current'])} of {days} days recorded."
+        )
+        if summary["current"]:
             cols = st.columns(3)
-            for col, key in zip(cols, ("mood", "energy", "stress")):
-                col.metric(key.title(), f"{frame[key].mean():.1f}/10")
-            st.line_chart(frame.set_index("day")[["mood", "energy", "stress"]])
-            st.caption("Missing days are not imputed. These are your ratings.")
+            for col, key in zip(cols, RATINGS):
+                change = summary["changes"][key]
+                col.metric(
+                    key.title(),
+                    f"{summary['means'][key]:.1f}/10",
+                    delta=f"{change:+.1f} points"
+                    if change is not None
+                    else None,
+                    delta_color="inverse" if key == "stress" else "normal",
+                )
+            st.caption(
+                "Averages use recorded days only. Higher mood and energy "
+                "ratings mean more; higher stress means more stress."
+            )
+            st.caption(
+                "Compared with "
+                f"{summary['previous_start']:%b %d, %Y} – "
+                f"{summary['previous_end']:%b %d, %Y}: "
+                f"{summary['previous_count']} of {days} days recorded."
+            )
+            if not summary["previous_count"]:
+                st.info("No check-ins in the previous period to compare yet.")
+            else:
+                st.caption(
+                    "Different recording patterns can affect comparisons. "
+                    "These changes describe your ratings, not their causes."
+                )
+            selected_ratings = st.multiselect(
+                "Ratings to show",
+                list(RATINGS),
+                default=list(RATINGS),
+                format_func=str.title,
+            )
+            style = st.selectbox(
+                "Chart style", ["Daily points", "Trend lines"]
+            )
+            frame = pd.DataFrame(summary["current"])
+            frame["day"] = pd.to_datetime(frame["day"])
+            if selected_ratings:
+                chart_data = frame.set_index("day")[selected_ratings]
+                chart = (
+                    st.scatter_chart
+                    if style == "Daily points"
+                    else st.line_chart
+                )
+                chart(chart_data, x_label="Day", y_label="Rating (1–10)")
+                st.caption(
+                    "Missing days are not filled in. Trend lines connect "
+                    "recorded days; values between them are not measurements."
+                )
+            else:
+                st.info("Choose at least one rating to show the chart.")
+            with st.expander("View recorded days"):
+                st.dataframe(
+                    frame[["day", *RATINGS, "sleep"]].rename(
+                        columns={
+                            "day": "Day",
+                            "mood": "Mood",
+                            "energy": "Energy",
+                            "stress": "Stress",
+                            "sleep": "Sleep (hours)",
+                        }
+                    ),
+                    hide_index=True,
+                )
         else:
-            st.info("No check-ins in this date window.")
+            st.info(
+                "No check-ins in this date window. Try an earlier end date."
+            )
     else:
         st.info("Save a check-in to start seeing your trends.")
+    st.subheader("Explore the past seven days")
+    st.caption("AI observations use the past seven days ending today.")
     context = weekly_context(repo, today)
     consent = ai_consent(
         "insight_consent",

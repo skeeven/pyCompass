@@ -158,7 +158,7 @@ class Repository:
 
     def review_insight(self, insight_id, status):
         """Approve or dismiss only an insight owned by this account."""
-        if status not in {"approved", "dismissed"}:
+        if status not in {"pending", "approved", "dismissed"}:
             raise ValueError("Invalid review status.")
         with self.db.connect() as conn:
             conn.execute(

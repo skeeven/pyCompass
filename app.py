@@ -7,12 +7,14 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
+from compass.account_ui import account_screen, forgot_password, link_screen
 from compass.auth import AuthService
 from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
 from compass.journal import filter_entries
 from compass.observations import read_observation, save_observation
+from compass.recovery import RecoveryService
 from compass.reflection import (
     PROMPTS,
     ReflectionService,
@@ -70,6 +72,7 @@ except Exception:
     st.error("Cannot open the database. Check your configuration.")
     st.stop()
 auth = AuthService(db)
+recovery = RecoveryService(db)
 try:
     today = datetime.now(ZoneInfo(settings.timezone)).date()
 except (ValueError, KeyError):
@@ -105,6 +108,9 @@ def sign_in():
                 st.stop()
             if user_id:
                 start_session(st.session_state, user_id)
+                st.session_state["auth_version"] = auth.security(user_id)[
+                    "version"
+                ]
                 st.rerun()
             st.error(
                 "Sign-in failed. Check your credentials or wait five "
@@ -115,24 +121,53 @@ def sign_in():
             username = st.text_input("Choose a username")
             password = st.text_input("Choose a password", type="password")
             confirm = st.text_input("Confirm password", type="password")
-            st.caption("Use 12+ characters. No email address is required.")
+            email = ""
+            if settings.recovery_enabled:
+                email = st.text_input("Recovery email", key="signup_email")
+                st.caption(
+                    "Use 12+ characters. Verify your email "
+                    "before using Compass."
+                )
+            else:
+                st.caption(
+                    "Use 12+ characters. Email recovery is not configured."
+                )
             if st.form_submit_button("Create account"):
                 if password != confirm:
                     st.error("Your passwords do not match.")
                 else:
                     try:
-                        auth.register(username, password)
-                        st.success("Account created. You can now sign in.")
+                        user_id = auth.register(username, password, email)
+                        if settings.recovery_enabled:
+                            try:
+                                recovery.request_verification(
+                                    user_id, email, password
+                                )
+                                st.success(
+                                    "Account created. Check your email "
+                                    "to verify it."
+                                )
+                            except Exception:
+                                st.warning(
+                                    "Account created, but email delivery "
+                                    "failed. "
+                                    "Sign in to request a verification "
+                                    "link again."
+                                )
+                        else:
+                            st.success("Account created. You can now sign in.")
                     except ValueError as exc:
                         st.error(str(exc))
                     except Exception:
                         st.error("Account creation failed. Please try again.")
+    forgot_password(recovery, settings.recovery_enabled)
     st.caption(
         "A personal wellness tool. No one monitors your entries. "
         "It does not provide diagnosis or treatment."
     )
 
 
+link_screen(recovery)
 had_session = "user_id" in st.session_state
 if not check_session(st.session_state, settings.session_timeout_minutes):
     if had_session:
@@ -140,10 +175,20 @@ if not check_session(st.session_state, settings.session_timeout_minutes):
     sign_in()
     st.stop()
 try:
+    security = auth.security(st.session_state["user_id"])
+    if st.session_state.get("auth_version", 0) != security["version"]:
+        logout()
     repo = Repository(db, st.session_state["user_id"])
 except ValueError:
     logout()
 ai = ReflectionService(settings)
+
+if security["required"] and not security["email"]:
+    st.info("Verify your recovery email to start using Compass.")
+    account_screen(auth, recovery, repo.user_id, settings.recovery_enabled)
+    if st.button("Sign out"):
+        logout()
+    st.stop()
 
 with st.sidebar:
     st.title("🧭 Compass")
@@ -156,6 +201,7 @@ with st.sidebar:
             "Insights",
             "Weekly reflection",
             "Privacy & data",
+            "Account security",
         ],
     )
     st.caption("Pause. Notice. Choose a small next step.")
@@ -661,6 +707,9 @@ elif page == "Weekly reflection":
                 ):
                     repo.delete("insights", row["id"])
                     st.rerun()
+
+elif page == "Account security":
+    account_screen(auth, recovery, repo.user_id, settings.recovery_enabled)
 
 elif page == "Privacy & data":
     st.title("Your data, your choices")

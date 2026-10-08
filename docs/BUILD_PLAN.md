@@ -216,3 +216,15 @@ See [RELEASE_CHECKS.md](RELEASE_CHECKS.md) for confirmed checks, the remaining
 phone/persistence/restart/export checks, and operational release limitations.
 No schema migration is needed. Stage 8 remains in progress until live checks
 are completed; public multi-user hardening is still a separate phase.
+
+## Account recovery update
+
+Forgot password, verified recovery email enrollment, and current-password changes
+are implemented with Zoho OAuth email delivery. Schema version 3 adds separate
+account security, hashed token, and rate-limit tables. Existing accounts retain
+access and records; new accounts require verification when delivery is configured.
+Database session versions revoke earlier sessions on their next interaction.
+Explicit transactions also protect cloud token redemption and password changes.
+See [PASSWORD_RECOVERY.md](PASSWORD_RECOVERY.md) for configuration and the live
+acceptance steps. Zoho delivery and the live cloud migration remain pending;
+Stage 8 live checks and the broader release-hardening phase remain open.

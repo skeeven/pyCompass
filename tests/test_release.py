@@ -33,7 +33,12 @@ def test_cloud_transactions_close_and_rollback(monkeypatch, failure):
     """Cloud adapter commits success and closes after write/commit failures."""
     conn = Mock()
     if failure == "commit":
-        conn.commit.side_effect = RuntimeError("Commit failed")
+
+        def execute(statement):
+            if statement == "COMMIT":
+                raise RuntimeError("Commit failed")
+
+        conn.execute.side_effect = execute
     monkeypatch.setitem(
         sys.modules,
         "sqlitecloud",
@@ -44,17 +49,20 @@ def test_cloud_transactions_close_and_rollback(monkeypatch, failure):
     def write():
         with db.connect() as connection:
             assert connection is conn
+            conn.execute.assert_called_once_with("BEGIN")
             if failure == "write":
                 raise RuntimeError("Write failed")
 
     if failure is None:
         write()
-        conn.commit.assert_called_once()
-        conn.rollback.assert_not_called()
+        assert [call.args[0] for call in conn.execute.call_args_list] == [
+            "BEGIN",
+            "COMMIT",
+        ]
     else:
         with pytest.raises(RuntimeError):
             write()
-        conn.rollback.assert_called_once()
+        assert conn.execute.call_args.args == ("ROLLBACK",)
     conn.close.assert_called_once()
 
 
@@ -76,3 +84,28 @@ def test_weekly_deletion_requires_confirmation(monkeypatch, users):
     assert not app.exception
     assert first.rows("insights") == []
     assert len(second.rows("insights")) == 1
+
+
+def test_cloud_autocommit_is_wrapped_in_explicit_transaction(
+    monkeypatch, tmp_path
+):
+    """Emulate the real cloud driver's default autocommit with SQLite."""
+    import sqlite3
+
+    path = str(tmp_path / "cloud_emulation.db")
+    monkeypatch.setitem(
+        sys.modules,
+        "sqlitecloud",
+        SimpleNamespace(
+            connect=lambda _: sqlite3.connect(path, isolation_level=None)
+        ),
+    )
+    db = Database(Settings(database_url="sqlitecloud://example"))
+    with db.connect() as conn:
+        conn.execute("CREATE TABLE example (value TEXT)")
+    with pytest.raises(RuntimeError):
+        with db.connect() as conn:
+            conn.execute("INSERT INTO example VALUES ('must roll back')")
+            raise RuntimeError("fail after first write")
+    with db.connect() as conn:
+        assert conn.execute("SELECT * FROM example").fetchall() == []

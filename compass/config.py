@@ -1,7 +1,8 @@
 """Load configuration without requiring Streamlit during service tests."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
@@ -16,6 +17,27 @@ class Settings:
     timezone: str = "America/Denver"
     allow_registration: bool = True
     session_timeout_minutes: int = 30
+    zoho_client_id: str = field(default="", repr=False)
+    zoho_client_secret: str = field(default="", repr=False)
+    zoho_refresh_token: str = field(default="", repr=False)
+    zoho_account_id: str = ""
+    zoho_domain: str = "com"
+    mail_from: str = ""
+    app_base_url: str = ""
+
+    @property
+    def recovery_enabled(self):
+        """Enable email features when all delivery settings are present."""
+        return all(
+            (
+                self.zoho_client_id,
+                self.zoho_client_secret,
+                self.zoho_refresh_token,
+                self.zoho_account_id,
+                self.mail_from,
+                self.app_base_url,
+            )
+        )
 
     def validate(self):
         """Reject invalid configuration without echoing credential values."""
@@ -35,6 +57,32 @@ class Settings:
             raise ValueError(
                 "SESSION_TIMEOUT_MINUTES must be between 1 and 1440."
             )
+        if self.zoho_domain not in {
+            "com",
+            "eu",
+            "in",
+            "com.au",
+            "jp",
+            "ca",
+            "com.cn",
+            "sa",
+        }:
+            raise ValueError("ZOHO_DOMAIN is not a supported region.")
+        if self.recovery_enabled:
+            address = urlsplit(self.app_base_url)
+            if (
+                address.scheme != "https"
+                or not address.hostname
+                or address.username
+                or address.password
+                or address.query
+                or address.fragment
+            ):
+                raise ValueError("APP_BASE_URL must be a plain HTTPS URL.")
+            if not self.zoho_account_id.isdigit():
+                raise ValueError(
+                    "ZOHO_ACCOUNT_ID must be a quoted numeric ID."
+                )
 
     @classmethod
     def load(cls, secrets=None):
@@ -61,6 +109,13 @@ class Settings:
             timezone=value("APP_TIMEZONE", "America/Denver"),
             allow_registration=registration == "true",
             session_timeout_minutes=timeout,
+            zoho_client_id=str(value("ZOHO_CLIENT_ID")),
+            zoho_client_secret=str(value("ZOHO_CLIENT_SECRET")),
+            zoho_refresh_token=str(value("ZOHO_REFRESH_TOKEN")),
+            zoho_account_id=str(value("ZOHO_ACCOUNT_ID")),
+            zoho_domain=str(value("ZOHO_DOMAIN", "com")),
+            mail_from=str(value("MAIL_FROM")),
+            app_base_url=str(value("APP_BASE_URL")),
         )
         settings.validate()
         return settings

@@ -11,6 +11,17 @@ from uuid import uuid4
 ITERATIONS = 600_000
 
 
+def normalize_email(email):
+    """Accept a single ordinary mailbox address, without header characters."""
+    email = email.strip().lower()
+    if len(email) > 254 or not re.fullmatch(
+        r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+",
+        email,
+    ):
+        raise ValueError("Enter a valid email address.")
+    return email
+
+
 def hash_password(password):
     """Hash a password using salted PBKDF2-HMAC-SHA256."""
     salt = secrets.token_hex(16)
@@ -41,7 +52,7 @@ class AuthService:
         self.db = db
         self.dummy_hash = hash_password(secrets.token_urlsafe(24))
 
-    def register(self, username, password):
+    def register(self, username, password, email=""):
         """Create an account; reject invalid and duplicate usernames."""
         if not self.db.settings.allow_registration:
             raise ValueError("Account creation is disabled.")
@@ -50,6 +61,8 @@ class AuthService:
             raise ValueError("Use 3–32 letters, numbers, or underscores.")
         if not 12 <= len(password) <= 256:
             raise ValueError("Use a password between 12 and 256 characters.")
+        if self.db.settings.recovery_enabled:
+            email = normalize_email(email)
         user_id = str(uuid4())
         with self.db.connect() as conn:
             if conn.execute(
@@ -67,7 +80,24 @@ class AuthService:
                     datetime.now(timezone.utc).isoformat(),
                 ),
             )
+            conn.execute(
+                """INSERT INTO account_security (user_id, email_required)
+                VALUES (?, ?)""",
+                (user_id, int(self.db.settings.recovery_enabled)),
+            )
         return user_id
+
+    def security(self, user_id):
+        """Read only the authenticated account's email and session version."""
+        with self.db.connect() as conn:
+            row = conn.execute(
+                """SELECT verified_email, email_required, session_version
+                FROM account_security WHERE user_id = ?""",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("Account is unavailable.")
+        return dict(zip(("email", "required", "version"), row))
 
     def login(self, username, password):
         """Return an account id or None with a generic failure message."""

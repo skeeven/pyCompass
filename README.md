@@ -128,7 +128,7 @@ than locking all transitive dependencies.
 - Every wellness operation is scoped to the authenticated user.
 - Signing out clears session state; restarting the browser session requires
   signing in again. Idle sessions expire on the next interaction after
-  30 minutes by default. There is no password recovery or persistent login.
+  30 minutes by default. Verified email recovery and password changes revoke earlier sessions on their next interaction. There is no persistent login.
 - Export contains wellness records, not password hashes or API credentials.
 - Journal text is not encrypted by this app. Secure your device and backups.
 - API requests use `store=False`. That does not guarantee zero provider
@@ -140,7 +140,7 @@ than locking all transitive dependencies.
 Use the initial app locally for personal testing. Before inviting other people
 or hosting it publicly, complete the release-hardening phase in the build plan.
 Use persistent database storage for a hosted app; ephemeral disks can lose the
-local SQLite file. The database tracks schema version 2 and preserves existing records.
+local SQLite file. The database tracks schema version 3 and preserves existing records.
 Future changes need explicit migrations. No automatic backup is included.
 
 Compass is a reflection tool, not therapy or diagnosis. No person monitors
@@ -168,3 +168,10 @@ correct crisis handling.
 
 These informed the configuration, driver interface and API adapter. They do
 not establish that this particular app has clinically validated outcomes.
+
+## Email recovery
+
+Forgot password and Account security support Zoho email verification, one-use
+30-minute reset links, and current-password changes. Existing users must enroll
+a verified recovery email first. See [PASSWORD_RECOVERY.md](docs/PASSWORD_RECOVERY.md)
+for the secrets, migration, limitations, and live deployment checks.

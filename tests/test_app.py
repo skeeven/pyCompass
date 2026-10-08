@@ -185,3 +185,90 @@ def test_companion_consent_failure_and_retry(monkeypatch, users):
     assert len(first.rows("messages")) == 2
     assert app.text_area(key="companion_draft").value == ""
     assert len(second.rows("messages")) == 2
+
+
+def test_account_password_change_revokes_other_session(monkeypatch, users):
+    """The account form requires the current password and logs sessions out."""
+    first, _ = users
+    app = open_app(monkeypatch, first.db)
+    other = open_app(monkeypatch, first.db)
+    for session in (app, other):
+        session.session_state["user_id"] = first.user_id
+        session.run()
+    app.radio[0].set_value("Account security").run()
+    app.text_input(key="change_current").set_value("wrong-password")
+    app.text_input(key="change_new").set_value("a-new-password-789")
+    app.text_input(key="change_confirm").set_value("a-new-password-789")
+    app.button(
+        key="FormSubmitter:change_password-Change password"
+    ).click().run()
+    assert app.error
+    app.text_input(key="change_current").set_value("a-long-password-123")
+    app.button(
+        key="FormSubmitter:change_password-Change password"
+    ).click().run()
+    assert not app.exception
+    assert "user_id" not in app.session_state
+    other.run()
+    assert not other.exception
+    assert "user_id" not in other.session_state
+    assert other.title[0].value == "🧭 Compass"
+
+
+def test_link_screen_requires_confirmation_and_clears_url(monkeypatch, users):
+    """Opening a link does not verify it or expose it in subsequent URLs."""
+    from unittest.mock import Mock
+
+    from compass.recovery import RecoveryService
+
+    first, _ = users
+    consume = Mock()
+    monkeypatch.setattr(RecoveryService, "consume", consume)
+    app = open_app(monkeypatch, first.db)
+    app.query_params["account_action"] = "verify"
+    app.query_params["account_token"] = "test-link-with-enough-characters"
+    app.run()
+    assert not app.exception
+    assert app.query_params == {}
+    assert not consume.called
+    app.button(
+        key="FormSubmitter:account_link_form-Verify my email"
+    ).click().run()
+    assert not app.exception
+    consume.assert_called_once_with(
+        "test-link-with-enough-characters", "verify", ""
+    )
+    assert app.success
+    assert "account_link" not in app.session_state
+
+
+def test_configured_new_account_is_gated_until_verified(monkeypatch, db):
+    """Unverified users can manage security but cannot view wellness pages."""
+    from unittest.mock import Mock
+
+    from compass.recovery import RecoveryService
+
+    app = open_app(monkeypatch, db)
+    for name, value in {
+        "ZOHO_CLIENT_ID": "test-client",
+        "ZOHO_CLIENT_SECRET": "test-secret",
+        "ZOHO_REFRESH_TOKEN": "test-refresh",
+        "ZOHO_ACCOUNT_ID": "123456",
+        "MAIL_FROM": "compass@example.com",
+        "APP_BASE_URL": "https://example.streamlit.app/",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(RecoveryService, "request_verification", Mock())
+    app.run()
+    app.text_input[2].set_value("new_user")
+    app.text_input[3].set_value("a-long-password-123")
+    app.text_input[4].set_value("a-long-password-123")
+    app.text_input(key="signup_email").set_value("new@example.com")
+    app.button(key="FormSubmitter:register-Create account").click().run()
+    app.text_input(key="login_username").set_value("new_user")
+    app.text_input(key="login_password").set_value("a-long-password-123")
+    app.button(key="FormSubmitter:login-Sign in").click().run()
+    assert not app.exception
+    assert app.title[0].value == "Account security"
+    assert not app.radio
+    assert not app.slider

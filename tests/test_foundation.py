@@ -48,13 +48,13 @@ def test_initialization_preserves_legacy_records(users):
     with first.db.connect() as conn:
         assert conn.execute(
             "SELECT version FROM schema_migrations"
-        ).fetchall() == [(1,), (2,)]
+        ).fetchall() == [(1,), (2,), (3,)]
 
 
 def test_newer_schema_requires_newer_app(db):
     """An older app refuses a newer database version."""
     with db.connect() as conn:
-        conn.execute("INSERT INTO schema_migrations (version) VALUES (3)")
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (4)")
     with pytest.raises(ValueError, match="newer version"):
         db.initialize()
 
@@ -88,7 +88,7 @@ def test_version_one_upgrade_keeps_checkin(users):
     with first.db.connect() as conn:
         for column in ("emotions", "contexts", "needs", "activity_done"):
             conn.execute(f"ALTER TABLE checkins DROP COLUMN {column}")
-        conn.execute("DELETE FROM schema_migrations WHERE version = 2")
+        conn.execute("DELETE FROM schema_migrations WHERE version >= 2")
     first.db.initialize()
     first.db.initialize()
     row = first.rows("checkins")[0]

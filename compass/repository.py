@@ -185,6 +185,14 @@ class Repository:
     def delete_account(self):
         """Delete this user's records and account in a single transaction."""
         with self.db.connect() as conn:
+            conn.execute(
+                "DELETE FROM account_tokens WHERE user_id = ?",
+                (self.user_id,),
+            )
+            conn.execute(
+                "DELETE FROM account_security WHERE user_id = ?",
+                (self.user_id,),
+            )
             for table in sorted(TABLES):
                 conn.execute(
                     f"DELETE FROM {table} WHERE user_id = ?",

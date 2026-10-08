@@ -52,7 +52,7 @@ SCHEMA = (
     "CREATE INDEX IF NOT EXISTS messages_owner ON messages(user_id)",
     "CREATE INDEX IF NOT EXISTS insights_owner ON insights(user_id)",
 )
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class Database:
@@ -74,10 +74,18 @@ class Database:
             conn = sqlite3.connect(path, timeout=10)
             conn.execute("PRAGMA foreign_keys = ON")
         try:
+            # SQLiteCloud autocommits unless a transaction is explicit.
+            conn.execute("BEGIN")
             yield conn
-            conn.commit()
+            if self.settings.database_url:
+                conn.execute("COMMIT")
+            else:
+                conn.commit()
         except Exception:
-            conn.rollback()
+            if self.settings.database_url:
+                conn.execute("ROLLBACK")
+            else:
+                conn.rollback()
             raise
         finally:
             conn.close()
@@ -126,4 +134,41 @@ class Database:
                         )
                 conn.execute(
                     "INSERT INTO schema_migrations (version) VALUES (2)"
+                )
+            if version < 3:
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS account_security (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id),
+                    verified_email TEXT UNIQUE,
+                    email_required INTEGER NOT NULL DEFAULT 0,
+                    session_version INTEGER NOT NULL DEFAULT 0
+                    )"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS account_tokens (
+                    token_hash TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    purpose TEXT NOT NULL CHECK(purpose IN ('verify','reset')),
+                    email TEXT NOT NULL,
+                    expires_at REAL NOT NULL
+                    )"""
+                )
+                conn.execute(
+                    """CREATE INDEX IF NOT EXISTS tokens_owner
+                    ON account_tokens(user_id)"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS account_limits (
+                    bucket TEXT PRIMARY KEY,
+                    window_start REAL NOT NULL,
+                    last_request REAL NOT NULL,
+                    requests INTEGER NOT NULL
+                    )"""
+                )
+                conn.execute(
+                    """INSERT OR IGNORE INTO account_security (user_id)
+                    SELECT id FROM users"""
+                )
+                conn.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (3)"
                 )

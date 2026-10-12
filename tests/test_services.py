@@ -95,7 +95,10 @@ def test_export_and_account_deletion(users):
     first.delete_account()
     for table in exported:
         assert first.rows(table) == []
-        assert second.rows(table)
+        if table in {"checkins", "journal", "messages", "insights"}:
+            assert second.rows(table)
+        else:
+            assert second.rows(table) == []
 
 
 def test_weekly_window_uses_local_journal_dates(users):

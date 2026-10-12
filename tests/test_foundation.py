@@ -3,6 +3,7 @@
 import pytest
 
 from compass.config import Settings
+from compass.db import SCHEMA_VERSION
 from compass.session import check_session, start_session
 
 
@@ -48,13 +49,16 @@ def test_initialization_preserves_legacy_records(users):
     with first.db.connect() as conn:
         assert conn.execute(
             "SELECT version FROM schema_migrations"
-        ).fetchall() == [(1,), (2,), (3,)]
+        ).fetchall() == [(version,) for version in range(1, SCHEMA_VERSION + 1)]
 
 
 def test_newer_schema_requires_newer_app(db):
     """An older app refuses a newer database version."""
     with db.connect() as conn:
-        conn.execute("INSERT INTO schema_migrations (version) VALUES (4)")
+        conn.execute(
+            "INSERT INTO schema_migrations (version) VALUES (?)",
+            (SCHEMA_VERSION + 1,),
+        )
     with pytest.raises(ValueError, match="newer version"):
         db.initialize()
 

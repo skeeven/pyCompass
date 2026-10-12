@@ -177,10 +177,21 @@ class Repository:
             )
 
     def export(self):
-        """Return an account's wellness data as JSON, excluding credentials."""
-        return json.dumps(
-            {table: self.rows(table) for table in sorted(TABLES)}, indent=2
-        )
+        """Export all owned wellness and health records."""
+        records = {table: self.rows(table) for table in sorted(TABLES)}
+        with self.db.connect() as conn:
+            for table in ("health_profiles", "health_daily_logs",
+                          "health_reports", "health_report_metrics",
+                          "health_weekly_reviews"):
+                cursor = conn.execute(
+                    f"SELECT * FROM {table} WHERE user_id = ?",
+                    (self.user_id,),
+                )
+                names = [col[0] for col in cursor.description]
+                records[table] = [
+                    dict(zip(names, row)) for row in cursor.fetchall()
+                ]
+        return json.dumps(records, indent=2)
 
     def delete_account(self):
         """Delete this user's records and account in a single transaction."""
@@ -193,6 +204,14 @@ class Repository:
                 "DELETE FROM account_security WHERE user_id = ?",
                 (self.user_id,),
             )
+            for table in (
+                "health_report_metrics", "health_reports",
+                "health_weekly_reviews", "health_daily_logs", "health_profiles"
+            ):
+                conn.execute(
+                    f"DELETE FROM {table} WHERE user_id = ?",
+                    (self.user_id,),
+                )
             for table in sorted(TABLES):
                 conn.execute(
                     f"DELETE FROM {table} WHERE user_id = ?",

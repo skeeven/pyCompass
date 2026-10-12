@@ -12,6 +12,7 @@ from compass.auth import AuthService
 from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
+from compass.health_ui import health_screen
 from compass.journal import filter_entries
 from compass.observations import read_observation, save_observation
 from compass.recovery import RecoveryService
@@ -196,6 +197,7 @@ with st.sidebar:
         "Your space",
         [
             "Today",
+            "Compass Health",
             "Journal",
             "Companion",
             "Insights",
@@ -241,7 +243,10 @@ def run_reflection(context, kind):
         )
 
 
-if page == "Today":
+if page == "Compass Health":
+    health_screen(db, repo.user_id)
+
+elif page == "Today":
     st.title("How are you arriving today?")
     st.caption(today.strftime("%A, %B %d, %Y"))
     existing = next(

@@ -52,7 +52,7 @@ SCHEMA = (
     "CREATE INDEX IF NOT EXISTS messages_owner ON messages(user_id)",
     "CREATE INDEX IF NOT EXISTS insights_owner ON insights(user_id)",
 )
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class Database:
@@ -172,3 +172,59 @@ class Database:
                 conn.execute(
                     "INSERT INTO schema_migrations (version) VALUES (3)"
                 )
+            if version < 4:
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS health_profiles (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id),
+                    profile_json TEXT NOT NULL DEFAULT '{}',
+                    onboarding_step INTEGER NOT NULL DEFAULT 0,
+                    completed_at TEXT
+                    )"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS health_daily_logs (
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    day TEXT NOT NULL,
+                    log_json TEXT NOT NULL DEFAULT '{}',
+                    PRIMARY KEY(user_id, day)
+                    )"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS health_reports (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    uploaded_at TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    report_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    period_start TEXT,
+                    period_end TEXT
+                    )"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS health_report_metrics (
+                    id TEXT PRIMARY KEY,
+                    report_id TEXT NOT NULL REFERENCES health_reports(id),
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    metric_name TEXT NOT NULL,
+                    metric_value REAL NOT NULL,
+                    unit TEXT NOT NULL,
+                    source_label TEXT NOT NULL
+                    )"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS health_weekly_reviews (
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    week_start TEXT NOT NULL,
+                    review_json TEXT NOT NULL,
+                    PRIMARY KEY(user_id, week_start)
+                    )"""
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS health_reports_owner "
+                    "ON health_reports(user_id)"
+                )
+                conn.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (4)"
+                )
+

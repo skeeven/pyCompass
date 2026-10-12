@@ -7,6 +7,10 @@ from uuid import uuid4
 from compass.journal import normalize_tags
 
 TABLES = {"checkins", "journal", "messages", "insights"}
+HEALTH_TABLES = {
+    "health_profiles", "health_daily_logs", "health_reports",
+    "health_report_metrics", "health_weekly_reviews",
+}
 
 
 def now():
@@ -28,13 +32,20 @@ class Repository:
 
     def rows(self, table):
         """Read this user's records in chronological order."""
-        if table not in TABLES:
+        if table not in TABLES | HEALTH_TABLES:
             raise ValueError("Unknown record type.")
-        order = "day" if table == "checkins" else "created_at"
+        order = {
+            "checkins": "day, id",
+            "health_daily_logs": "day",
+            "health_weekly_reviews": "week_start",
+            "health_profiles": "user_id",
+            "health_reports": "uploaded_at, id",
+            "health_report_metrics": "id",
+        }.get(table, "created_at, id")
         with self.db.connect() as conn:
             cursor = conn.execute(
                 f"SELECT * FROM {table} WHERE user_id = ? "
-                f"ORDER BY {order}, id",
+                f"ORDER BY {order}",
                 (self.user_id,),
             )
             names = [column[0] for column in cursor.description]
@@ -178,20 +189,10 @@ class Repository:
 
     def export(self):
         """Export all owned wellness and health records."""
-        records = {table: self.rows(table) for table in sorted(TABLES)}
-        with self.db.connect() as conn:
-            for table in ("health_profiles", "health_daily_logs",
-                          "health_reports", "health_report_metrics",
-                          "health_weekly_reviews"):
-                cursor = conn.execute(
-                    f"SELECT * FROM {table} WHERE user_id = ?",
-                    (self.user_id,),
-                )
-                names = [col[0] for col in cursor.description]
-                records[table] = [
-                    dict(zip(names, row)) for row in cursor.fetchall()
-                ]
-        return json.dumps(records, indent=2)
+        return json.dumps(
+            {table: self.rows(table) for table in sorted(TABLES | HEALTH_TABLES)},
+            indent=2,
+        )
 
     def delete_account(self):
         """Delete this user's records and account in a single transaction."""

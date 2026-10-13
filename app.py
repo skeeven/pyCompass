@@ -119,9 +119,9 @@ def sign_in():
             )
     if settings.allow_registration:
         with tabs[1], st.form("register", clear_on_submit=True):
-            username = st.text_input("Choose a username")
-            password = st.text_input("Choose a password", type="password")
-            confirm = st.text_input("Confirm password", type="password")
+            username = st.text_input("Choose a username", key="signup_username")
+            password = st.text_input("Choose a password", type="password", key="signup_password")
+            confirm = st.text_input("Confirm password", type="password", key="signup_confirm")
             email = ""
             if settings.recovery_enabled:
                 email = st.text_input("Recovery email", key="signup_email")

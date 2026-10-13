@@ -30,12 +30,12 @@ def test_login_screen(monkeypatch, db):
 def test_registration_and_login_forms(monkeypatch, db):
     """Create and authenticate an account through the actual UI forms."""
     app = open_app(monkeypatch, db).run()
-    app.text_input[2].set_value("steve")
-    app.text_input[3].set_value("a-long-password-123")
-    app.text_input[4].set_value("a-long-password-123")
+    app.text_input(key="signup_username").set_value("steve")
+    app.text_input(key="signup_password").set_value("a-long-password-123")
+    app.text_input(key="signup_confirm").set_value("a-long-password-123")
     app.button(key="FormSubmitter:register-Create account").click().run()
     assert not app.exception
-    assert app.success
+    assert app.success, f"Registration errors: {[e.message for e in app.error]}"
     app.text_input(key="login_username").set_value("steve")
     app.text_input(key="login_password").set_value("a-long-password-123")
     app.button(key="FormSubmitter:login-Sign in").click().run()
@@ -260,9 +260,9 @@ def test_configured_new_account_is_gated_until_verified(monkeypatch, db):
         monkeypatch.setenv(name, value)
     monkeypatch.setattr(RecoveryService, "request_verification", Mock())
     app.run()
-    app.text_input[2].set_value("new_user")
-    app.text_input[3].set_value("a-long-password-123")
-    app.text_input[4].set_value("a-long-password-123")
+    app.text_input(key="signup_username").set_value("new_user")
+    app.text_input(key="signup_password").set_value("a-long-password-123")
+    app.text_input(key="signup_confirm").set_value("a-long-password-123")
     app.text_input(key="signup_email").set_value("new@example.com")
     app.button(key="FormSubmitter:register-Create account").click().run()
     app.text_input(key="login_username").set_value("new_user")

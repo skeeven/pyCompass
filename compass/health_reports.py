@@ -35,7 +35,7 @@ def extract_pdf_text(data):
     if not text.strip():
         raise ValueError("No selectable text found. Scanned PDFs are not supported yet.")
     if not re.search(
-        r"\\b(?:ResMed|myAir|Average usage|Average AHI|Sleep therapy|Sleep Cycle)\\b",
+        r"\b(?:ResMed|myAir|Average usage|Average AHI|Sleep therapy|Sleep Cycle)\b",
         text, re.IGNORECASE,
     ):
         raise ValueError(

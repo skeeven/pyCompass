@@ -119,9 +119,14 @@ def report_import_screen(db, user_id):
         confirmed = st.checkbox(
             "I checked the date range, units, and values against the original PDF."
         )
-        submitted = st.form_submit_button("Save verified measurements",
-                                          disabled=not confirmed or not selected)
+        submitted = st.form_submit_button("Save verified measurements")
     if submitted:
+        if not selected:
+            st.warning("Select at least one measurement to save.")
+            return
+        if not confirmed:
+            st.warning("Please confirm the values, units, and date range before saving.")
+            return
         try:
             save_report(db, user_id, upload.name, kind, start, end, metrics)
         except ValueError as exc:

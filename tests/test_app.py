@@ -16,6 +16,13 @@ def open_app(monkeypatch, db):
     monkeypatch.setenv("ALLOW_REGISTRATION", "true")
     monkeypatch.setenv("APP_TIMEZONE", "America/Denver")
     monkeypatch.setenv("SESSION_TIMEOUT_MINUTES", "30")
+    # Do not inherit the developer's private Zoho email configuration.
+    # Tests that exercise verification explicitly set these values later.
+    for key in (
+        "ZOHO_CLIENT_ID", "ZOHO_CLIENT_SECRET", "ZOHO_REFRESH_TOKEN",
+        "ZOHO_ACCOUNT_ID", "MAIL_FROM", "APP_BASE_URL",
+    ):
+        monkeypatch.setenv(key, "")
     return AppTest.from_file(str(APP), default_timeout=20)
 
 

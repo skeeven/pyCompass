@@ -33,6 +33,14 @@ def extract_pdf_text(data):
         raise ValueError("Unable to read this PDF.") from exc
     if not text.strip():
         raise ValueError("No selectable text found. Scanned PDFs are not supported yet.")
+    if not re.search(
+        r"\\b(?:ResMed|myAir|Average usage|Average AHI|Sleep therapy|Sleep Cycle)\\b",
+        text, re.IGNORECASE,
+    ):
+        raise ValueError(
+            "PDF text is unreadable or unsupported. This report needs OCR; "
+            "no measurements were saved."
+        )
     return text[:40000]
 
 
@@ -56,7 +64,7 @@ def save_report(db, user_id, filename, kind, start, end, metrics):
         raise ValueError("Unsupported report type.")
     if not isinstance(start, date) or not isinstance(end, date) or start > end:
         raise ValueError("Choose a valid report date range.")
-    if not metrics or set(metrics) - METRICS:
+    if not metrics or set(metrics) - set(METRICS):
         raise ValueError("Select at least one supported metric.")
     for key, value in metrics.items():
         if not isinstance(value, (float, int)) or not 0 <= value <= 10000:

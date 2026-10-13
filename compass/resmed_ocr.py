@@ -5,7 +5,7 @@ The original PDF and OCR text are not persisted. Only confirmed metrics are save
 
 import io
 import re
-from datetime import date
+from datetime import datetime
 
 import fitz
 import pytesseract
@@ -20,7 +20,7 @@ HEADER = re.compile(
 
 
 def _date(value):
-    return date.strptime(value.replace(",", ""), "%b %d %Y")
+    return datetime.strptime(value.replace(",", ""), "%b %d %Y").date()
 
 
 def recognize_resmed_pdf(data):

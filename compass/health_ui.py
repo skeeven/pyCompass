@@ -5,6 +5,7 @@ import streamlit as st
 from compass.health import HealthService, ONBOARDING_STEPS
 from compass.health_reports import METRICS, extract_pdf_text, suggested_metrics, save_report
 from datetime import date
+from compass.resmed_ocr import recognize_resmed_pdf, parse_resmed_periods
 
 PRIORITIES = ["Sleep", "Energy", "Weight", "Nutrition", "Movement", "Stress", "Other"]
 ACTIVITY = ["Prefer not to say", "Mostly seated", "Lightly active", "Moderately active", "Very active"]
@@ -92,6 +93,9 @@ def report_import_screen(db, user_id):
     upload = st.file_uploader("Choose a PDF (8 MB maximum)", type=["pdf"])
     if upload is None:
         return
+    if kind == "ResMed CPAP":
+        resmed_review_screen(db, user_id, upload)
+        return
     try:
         text = extract_pdf_text(upload.getvalue())
     except ValueError as exc:
@@ -133,3 +137,61 @@ def report_import_screen(db, user_id):
             st.error(str(exc))
         else:
             st.success("Verified period measurements saved. The PDF was not stored.")
+
+
+def resmed_review_screen(db, user_id, upload):
+    """Present separately dated sections; never save without verification."""
+    try:
+        with st.spinner("Reading report visually (OCR)..."):
+            text = recognize_resmed_pdf(upload.getvalue())
+        periods = parse_resmed_periods(text)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    if not periods:
+        st.error("No dated ResMed report sections could be recognized. Nothing was saved.")
+        return
+    st.caption(
+        f"Recognized {len(periods)} reporting period(s). "
+        "Please compare all values to the PDF before saving."
+    )
+    with st.expander("OCR text for troubleshooting (not saved)"):
+        st.text_area("Recognized text", text[:20000], disabled=True, height=180)
+    with st.form("verify_resmed_periods"):
+        confirmed_metrics = []
+        for idx, period in enumerate(periods):
+            st.subheader(
+                f"{period['start']:%b %d, %Y} – {period['end']:%b %d, %Y}"
+            )
+            st.caption("Period summary, not measurements on individual days.")
+            fields = {}
+            for name, suggested in period["metrics"].items():
+                label, unit = METRICS[name]
+                denominator = period["denominators"].get(name)
+                suffix = f" (out of {denominator} nights)" if denominator is not None else ""
+                fields[name] = st.number_input(
+                    f"{label} ({unit}){suffix}",
+                    value=float(suggested),
+                    min_value=0.0,
+                    step=0.01 if name in {"ahi", "leak_l_min"} else 0.1,
+                    key=f"resmed_{idx}_{name}",
+                )
+            confirmed_metrics.append(fields)
+        confirmed = st.checkbox(
+            "I checked each reporting period, value, and unit against the PDF."
+        )
+        submit = st.form_submit_button("Save verified report periods")
+    if submit:
+        if not confirmed:
+            st.warning("Confirm the extracted measurements before saving.")
+            return
+        if any(not metrics for metrics in confirmed_metrics):
+            st.warning("One or more periods have no recognized measurements.")
+            return
+        for period, metrics in zip(periods, confirmed_metrics):
+            save_report(
+                db, user_id, upload.name, "ResMed CPAP",
+                period["start"], period["end"], metrics,
+                denominators=period["denominators"],
+            )
+        st.success(f"Saved {len(periods)} verified reporting periods. No PDF was retained.")

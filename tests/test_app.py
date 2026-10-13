@@ -23,7 +23,24 @@ def open_app(monkeypatch, db):
         "ZOHO_ACCOUNT_ID", "MAIL_FROM", "APP_BASE_URL",
     ):
         monkeypatch.setenv(key, "")
-    return AppTest.from_file(str(APP), default_timeout=20)
+    app = AppTest.from_file(str(APP), default_timeout=20)
+    # A non-empty AppTest.secrets overrides the actual local secrets.toml.
+    # Streamlit may otherwise import Zoho values into the test process,
+    # causing unrelated signup tests to require an email address.
+    app.secrets.update({
+        "DATABASE_PATH": db.settings.database_path,
+        "SQLITECLOUD_URL": "",
+        "OPENAI_API_KEY": "",
+        "ALLOW_REGISTRATION": "true",
+        "APP_TIMEZONE": "America/Denver",
+        "ZOHO_CLIENT_ID": "",
+        "ZOHO_CLIENT_SECRET": "",
+        "ZOHO_REFRESH_TOKEN": "",
+        "ZOHO_ACCOUNT_ID": "",
+        "MAIL_FROM": "",
+        "APP_BASE_URL": "",
+    })
+    return app
 
 
 def test_login_screen(monkeypatch, db):

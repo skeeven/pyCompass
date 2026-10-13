@@ -3,6 +3,7 @@
 import streamlit as st
 
 from compass.health import HealthService, ONBOARDING_STEPS
+from compass.health_history import list_saved_reports
 from compass.health_reports import METRICS, extract_pdf_text, suggested_metrics, save_report
 from datetime import date
 from compass.resmed_ocr import recognize_resmed_pdf, parse_resmed_periods
@@ -19,11 +20,15 @@ def health_screen(db, user_id):
     step = min(profile["step"], len(ONBOARDING_STEPS) - 1)
 
     st.title("Your Health Journey")
-    onboarding_tab, reports_tab = st.tabs(["My health profile", "Sleep report imports"])
+    onboarding_tab, reports_tab, history_tab = st.tabs(
+        ["My health profile", "Sleep report imports", "Health history"]
+    )
     with reports_tab:
         report_import_screen(db, user_id)
     with onboarding_tab:
         onboarding_screen(service, profile, answers, step)
+    with history_tab:
+        report_history_screen(db, user_id)
 
 
 def onboarding_screen(service, profile, answers, step):
@@ -195,3 +200,48 @@ def resmed_review_screen(db, user_id, upload):
                 denominators=period["denominators"],
             )
         st.success(f"Saved {len(periods)} verified reporting periods. No PDF was retained.")
+
+
+def report_history_screen(db, user_id):
+    """Review verified reports after the upload session has ended."""
+    st.subheader("Saved sleep reports")
+    st.caption(
+        "Each record summarizes its stated reporting period. "
+        "Overlapping 30-, 90-, and 365-day periods are not separate daily measurements."
+    )
+    reports = list_saved_reports(db, user_id)
+    if not reports:
+        st.info("No saved reports yet. Import and verify a sleep report to see it here.")
+        return
+
+    st.caption(f"{len(reports)} saved reporting period(s)")
+    for report in reports:
+        with st.expander(
+            f"{report['period_start']} to {report['period_end']} · "
+            f"{report['report_type']}",
+            expanded=False,
+        ):
+            st.caption(
+                f"Source: {report['filename']} · "
+                f"Imported {report['uploaded_at'][:10]} · "
+                f"Status: {report['status']}"
+            )
+            rows = []
+            for key, info in report["metrics"].items():
+                label, unit = METRICS[key]
+                value = info["value"]
+                display = (
+                    f"{value:.2f}" if key in {"ahi", "leak_l_min"}
+                    else f"{value:.2f}" if key.endswith("_hours")
+                    else str(int(value))
+                )
+                rows.append({
+                    "Measurement": label,
+                    "Value": display,
+                    "Unit": unit,
+                    "Details": info["source"],
+                })
+            if rows:
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+            else:
+                st.info("This reporting period has no recognized saved measurements.")

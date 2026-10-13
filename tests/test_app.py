@@ -35,7 +35,7 @@ def test_registration_and_login_forms(monkeypatch, db):
     app.text_input(key="signup_confirm").set_value("a-long-password-123")
     app.button(key="FormSubmitter:register-Create account").click().run()
     assert not app.exception
-    assert app.success, f"Registration errors: {[e.message for e in app.error]}"
+    assert app.success, f"Registration errors: {[e.value for e in app.error]}"
     app.text_input(key="login_username").set_value("steve")
     app.text_input(key="login_password").set_value("a-long-password-123")
     app.button(key="FormSubmitter:login-Sign in").click().run()

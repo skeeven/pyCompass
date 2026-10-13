@@ -3,6 +3,8 @@
 import streamlit as st
 
 from compass.health import HealthService, ONBOARDING_STEPS
+from compass.health_reports import METRICS, extract_pdf_text, suggested_metrics, save_report
+from datetime import date
 
 PRIORITIES = ["Sleep", "Energy", "Weight", "Nutrition", "Movement", "Stress", "Other"]
 ACTIVITY = ["Prefer not to say", "Mostly seated", "Lightly active", "Moderately active", "Very active"]
@@ -16,6 +18,15 @@ def health_screen(db, user_id):
     step = min(profile["step"], len(ONBOARDING_STEPS) - 1)
 
     st.title("Your Health Journey")
+    onboarding_tab, reports_tab = st.tabs(["My health profile", "Sleep report imports"])
+    with reports_tab:
+        report_import_screen(db, user_id)
+    with onboarding_tab:
+        onboarding_screen(service, profile, answers, step)
+
+
+def onboarding_screen(service, profile, answers, step):
+    """Keep onboarding independent from report import state."""
     st.caption("Private wellness onboarding · optional questions · not medical care")
     if profile["completed_at"]:
         st.success("Your starting profile is saved. You can update it below.")
@@ -72,3 +83,48 @@ def health_screen(db, user_id):
     if go_next:
         service.save({**answers, **updates}, min(step + 1, 6), completed=step == 6)
         st.rerun()
+
+
+def report_import_screen(db, user_id):
+    st.subheader("Import a sleep report")
+    st.caption("Text-based PDFs only. The PDF is processed in memory and not saved.")
+    kind = st.selectbox("Report source", ["ResMed CPAP", "Sleep Cycle"])
+    upload = st.file_uploader("Choose a PDF (8 MB maximum)", type=["pdf"])
+    if upload is None:
+        return
+    try:
+        text = extract_pdf_text(upload.getvalue())
+    except ValueError as exc:
+        st.warning(str(exc))
+        return
+    st.info("Review the report text and enter the period covered. Suggestions may be wrong.")
+    with st.expander("View extracted text (not saved)", expanded=False):
+        st.text_area("PDF text", text, height=220, disabled=True)
+    suggestions = suggested_metrics(text)
+    with st.form("confirm_health_pdf"):
+        start = st.date_input("Report period starts", value=date.today())
+        end = st.date_input("Report period ends", value=date.today())
+        st.caption("These values describe the whole report period, not individual days.")
+        selected = st.multiselect("Metrics to record", list(METRICS),
+                                  format_func=lambda key: METRICS[key][0])
+        metrics = {}
+        for key in selected:
+            metrics[key] = st.number_input(
+                f"{METRICS[key][0]} ({METRICS[key][1]})",
+                min_value=0.0,
+                value=float(suggestions.get(key, 0.0)),
+                step=0.1,
+                key=f"report_metric_{key}",
+            )
+        confirmed = st.checkbox(
+            "I checked the date range, units, and values against the original PDF."
+        )
+        submitted = st.form_submit_button("Save verified measurements",
+                                          disabled=not confirmed or not selected)
+    if submitted:
+        try:
+            save_report(db, user_id, upload.name, kind, start, end, metrics)
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.success("Verified period measurements saved. The PDF was not stored.")

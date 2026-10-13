@@ -88,7 +88,7 @@ def onboarding_screen(service, profile, answers, step):
 
 def report_import_screen(db, user_id):
     st.subheader("Import a sleep report")
-    st.caption("Text-based PDFs only. The PDF is processed in memory and not saved.")
+    st.caption("ResMed reports are read with OCR; Sleep Cycle supports text-based PDFs. Original PDFs are not saved.")
     kind = st.selectbox("Report source", ["ResMed CPAP", "Sleep Cycle"])
     upload = st.file_uploader("Choose a PDF (8 MB maximum)", type=["pdf"])
     if upload is None:

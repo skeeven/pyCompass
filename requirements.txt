@@ -4,3 +4,5 @@ openai>=1.75,<4
 sqlitecloud>=0.0.84,<1
 tzdata>=2025.1
 pypdf>=5,<7
+PyMuPDF>=1.24,<2
+pytesseract>=0.3.13,<1

@@ -96,6 +96,9 @@ def trends_screen(db, user_id, today):
     available = [field for field, *_ in NUMERIC_FIELDS
                  if any(field in record for record in records)]
     options = {field: label for field, label, *_ in NUMERIC_FIELDS}
+    if not available:
+        st.info("Only notes have been logged in this window. Add a numeric measurement to see a chart.")
+        return
     selected = st.selectbox(
         "Measurement to chart", available,
         format_func=lambda key: options[key],

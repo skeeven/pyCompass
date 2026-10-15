@@ -1,10 +1,9 @@
 """Human-readable, non-diagnostic weekly Compass Health review."""
 
-from datetime import timedelta
-
 import streamlit as st
 
 from compass.health_weekly import WeeklyHealthService, week_bounds
+from compass.health import HealthService
 from compass.health_daily_ui import NUMERIC_FIELDS
 
 
@@ -45,6 +44,10 @@ def weekly_health_screen(db, user_id, today):
                     f"{report['period_end']}"
                 )
 
+    goals = HealthService(db, user_id).load()["answers"].get("goals")
+    if goals:
+        with st.expander("My starting goals"):
+            st.write(goals)
     saved = service.get(selected)
     st.write("**Reflect on your week**")
     with st.form(f"health_weekly_review_{start}"):

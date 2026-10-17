@@ -1,6 +1,34 @@
 """Landing shortcuts use Compass's existing sidebar routing."""
 
-from tests.test_app import open_app
+from pathlib import Path
+
+from streamlit.testing.v1 import AppTest
+
+
+def open_app(monkeypatch, db):
+    monkeypatch.setenv("DATABASE_PATH", db.settings.database_path)
+    monkeypatch.setenv("SQLITECLOUD_URL", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("ALLOW_REGISTRATION", "true")
+    monkeypatch.setenv("APP_TIMEZONE", "America/Denver")
+    app = AppTest.from_file(
+        str(Path(__file__).resolve().parents[1] / "app.py"),
+        default_timeout=20,
+    )
+    app.secrets.update({
+        "DATABASE_PATH": db.settings.database_path,
+        "SQLITECLOUD_URL": "",
+        "OPENAI_API_KEY": "",
+        "ALLOW_REGISTRATION": "true",
+        "APP_TIMEZONE": "America/Denver",
+        "ZOHO_CLIENT_ID": "",
+        "ZOHO_CLIENT_SECRET": "",
+        "ZOHO_REFRESH_TOKEN": "",
+        "ZOHO_ACCOUNT_ID": "",
+        "MAIL_FROM": "",
+        "APP_BASE_URL": "",
+    })
+    return app
 
 
 def test_landing_shortcut_navigation(monkeypatch, users):

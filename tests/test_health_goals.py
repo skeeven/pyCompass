@@ -37,7 +37,7 @@ def test_explicit_goal_validation():
 def test_week_comparison_respects_samples():
     rows = [
         {"day": "2026-10-04", "energy": 4},
-        {"day": "2026-10-11", "energy": 6},
+        {"day": "2026-10-05", "energy": 6},
         {"day": "2026-10-12", "energy": 8},
         {"day": "2026-10-13", "sleep_hours": 7},
     ]

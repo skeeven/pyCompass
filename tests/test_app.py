@@ -89,8 +89,8 @@ def test_checkin_journal_navigation_and_logout(monkeypatch, users):
     app.session_state["user_id"] = first.user_id
     app.run()
     assert not app.exception
-    app.slider[0].set_value(8)
-    app.button(key="FormSubmitter:checkin-Save today's check-in").click().run()
+    app.selectbox(key="today_mood").set_value(8)
+    app.button(key="FormSubmitter:checkin-Save check-in").click().run()
     assert not app.exception
     assert first.rows("checkins")[0]["mood"] == 8
     app.radio[0].set_value("Journal").run()
@@ -124,7 +124,7 @@ def test_optional_checkin_fields_survive_reload(monkeypatch, users):
     app.multiselect[1].set_value(["Personal time"])
     app.text_area[1].set_value("A little rest")
     app.checkbox[0].check()
-    app.button(key="FormSubmitter:checkin-Save today's check-in").click().run()
+    app.button(key="FormSubmitter:checkin-Save check-in").click().run()
     assert not app.exception
     reloaded = open_app(monkeypatch, first.db)
     reloaded.session_state["user_id"] = first.user_id

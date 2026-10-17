@@ -34,6 +34,49 @@ def daily_screen(db, user_id, today):
     existing = service.get(selected_day)
     if existing:
         st.info("A check-in exists for this day. Saving will update it.")
+    st.caption("Quick entry: record a few core measurements, or expand the full check-in.")
+    with st.form(f"health_quick_{selected_day.isoformat()}"):
+        quick = {}
+        for key, label in (
+            ("sleep_hours", "Sleep (hours)"),
+            ("energy", "Energy (1–10)"),
+            ("movement_minutes", "Movement (minutes)"),
+        ):
+            bounds = next(field for field in NUMERIC_FIELDS if field[0] == key)
+            value = st.number_input(
+                label + " · optional",
+                min_value=bounds[2],
+                max_value=bounds[3],
+                value=float(existing[key]) if key in existing else None,
+                step=bounds[4],
+                key=f"quick_{selected_day}_{key}",
+            )
+            if value is not None:
+                quick[key] = value
+        quick_save = st.form_submit_button("Save quick check-in")
+    if quick_save:
+        if not quick:
+            st.warning("Enter at least one measurement to save.")
+        else:
+            service.save(selected_day, {**existing, **quick})
+            st.success("Quick check-in saved.")
+            st.rerun()
+    with st.expander("Full health check-in", expanded=False):
+        full_health_form(service, selected_day, existing)
+    if existing:
+        with st.expander("Delete this day's health check-in"):
+            if st.checkbox(
+                "I understand this permanently deletes this day's health log",
+                key=f"health_delete_confirm_{selected_day}",
+            ) and st.button(
+                "Delete check-in", key=f"health_delete_{selected_day}"
+            ):
+                service.delete(selected_day)
+                st.rerun()
+
+
+def full_health_form(service, selected_day, existing):
+    """Optional detailed entries keep all previously saved values editable."""
     with st.form(f"daily_health_{selected_day.isoformat()}"):
         values = {}
         for key, label, minimum, maximum, step in NUMERIC_FIELDS:
@@ -69,16 +112,6 @@ def daily_screen(db, user_id, today):
         else:
             st.success(f"Saved check-in for {selected_day:%b %d, %Y}.")
             st.rerun()
-    if existing:
-        with st.expander("Delete this day's health check-in"):
-            if st.checkbox(
-                "I understand this permanently deletes this day's health log",
-                key=f"health_delete_confirm_{selected_day}",
-            ) and st.button(
-                "Delete check-in", key=f"health_delete_{selected_day}"
-            ):
-                service.delete(selected_day)
-                st.rerun()
 
 
 def trends_screen(db, user_id, today):

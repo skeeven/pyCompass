@@ -64,7 +64,7 @@ def test_registration_and_login_forms(monkeypatch, db):
     app.text_input(key="login_password").set_value("a-long-password-123")
     app.button(key="FormSubmitter:login-Sign in").click().run()
     assert not app.exception
-    assert app.title[0].value == "How are you arriving today?"
+    assert app.title[0].value == "A moment for you"
     assert "last_activity" in app.session_state
 
 

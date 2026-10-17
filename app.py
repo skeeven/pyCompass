@@ -32,12 +32,13 @@ st.set_page_config(
     page_title="Compass · Find your direction",
     page_icon="🧭",
     layout="centered",
+    initial_sidebar_state="collapsed",
 )
 st.markdown(
     """<style>
     .stApp {background: #f7faf8;}
     h1, h2, h3 {color: #214e43;}
-    .block-container {max-width: 850px; padding-top: 2rem;}
+    .block-container {max-width: 850px; padding-top: 1.25rem;}\n    div[data-testid="stVerticalBlock"] {gap: 0.55rem;}\n    div[data-testid="stForm"] {padding: 0.9rem 1rem; border-radius: 14px;}
     div[data-testid="stMetric"] {background: #eaf3ef; padding: 1rem;
       border-radius: 12px;}
     @media (max-width: 640px) {
@@ -205,6 +206,8 @@ with st.sidebar:
             "Privacy & data",
             "Account security",
         ],
+        key="compass_navigation",
+        label_visibility="collapsed",
     )
     st.caption("Pause. Notice. Choose a small next step.")
     if st.button("Sign out"):
@@ -247,47 +250,57 @@ if page == "Compass Health":
     health_screen(db, repo.user_id)
 
 elif page == "Today":
-    st.title("How are you arriving today?")
+    st.title("A moment for you")
     st.caption(today.strftime("%A, %B %d, %Y"))
     existing = next(
-        (
-            row
-            for row in repo.rows("checkins")
-            if row["day"] == today.isoformat()
-        ),
+        (row for row in repo.rows("checkins") if row["day"] == today.isoformat()),
         {},
     )
-    st.write("Start with the ratings. Everything else is optional.")
+    st.write("**Quick check-in**")
     if existing:
-        st.caption("Today's check-in is saved. You can update it below.")
+        st.caption("Saved today · adjust your answers anytime.")
+
     with st.form("checkin"):
-        st.caption("1 = very low mood · 10 = very good mood")
-        mood = st.slider("Mood · low to high", 1, 10, existing.get("mood", 5))
-        st.caption("1 = exhausted · 10 = energized")
-        energy = st.slider("Energy", 1, 10, existing.get("energy", 5))
-        st.caption("1 = relaxed · 10 = extremely stressed")
-        stress = st.slider("Stress", 1, 10, existing.get("stress", 5))
+        col_mood, col_energy, col_stress = st.columns(3, gap="small")
+        with col_mood:
+            mood = st.selectbox(
+                "Mood", range(1, 11),
+                index=int(existing.get("mood", 5)) - 1,
+                help="1 = very low mood; 10 = very good mood.",
+                key="today_mood",
+            )
+        with col_energy:
+            energy = st.selectbox(
+                "Energy", range(1, 11),
+                index=int(existing.get("energy", 5)) - 1,
+                help="1 = exhausted; 10 = energized.",
+                key="today_energy",
+            )
+        with col_stress:
+            stress = st.selectbox(
+                "Stress", range(1, 11),
+                index=int(existing.get("stress", 5)) - 1,
+                help="1 = relaxed; 10 = extremely stressed.",
+                key="today_stress",
+            )
         sleep = st.number_input(
-            "Hours of sleep",
-            0.0,
-            24.0,
-            float(existing.get("sleep", 7.0)),
-            0.5,
+            "Sleep (hours)", min_value=0.0, max_value=24.0,
+            value=float(existing.get("sleep", 7.0)), step=0.5,
+            key="today_sleep",
         )
-        note = st.text_area(
-            "What is on your mind?",
-            existing.get("note", ""),
-            max_chars=2000,
-        )
-        with st.expander("Add a little context (optional)"):
+        with st.expander("Notes & feelings (optional)"):
+            note = st.text_area(
+                "What's on your mind?",
+                existing.get("note", ""),
+                max_chars=2000,
+                key="today_note",
+            )
             emotions = st.multiselect(
-                "What feelings are present?",
-                EMOTIONS,
+                "Feelings", EMOTIONS,
                 default=json.loads(existing.get("emotions", "[]")),
             )
             contexts = st.multiselect(
-                "What is influencing today?",
-                CONTEXTS,
+                "What's influencing today?", CONTEXTS,
                 default=json.loads(existing.get("contexts", "[]")),
             )
             needs = st.text_area(
@@ -296,26 +309,44 @@ elif page == "Today":
                 placeholder="Rest, support, connection, space…",
                 max_chars=1000,
             )
-        st.subheader("One small thing")
-        st.info(activity(today))
-        activity_done = st.checkbox(
-            "I completed today's activity",
-            value=bool(existing.get("activity_done", 0)),
-        )
-        if st.form_submit_button("Save today's check-in", type="primary"):
+        with st.expander("One small thing (optional)"):
+            st.caption(activity(today))
+            activity_done = st.checkbox(
+                "I completed today's activity",
+                value=bool(existing.get("activity_done", 0)),
+            )
+        if st.form_submit_button(
+            "Save check-in", type="primary", use_container_width=True
+        ):
             repo.save_checkin(
-                today.isoformat(),
-                mood,
-                energy,
-                stress,
-                sleep,
-                note,
-                emotions=emotions,
-                contexts=contexts,
-                needs=needs,
+                today.isoformat(), mood, energy, stress, sleep, note,
+                emotions=emotions, contexts=contexts, needs=needs,
                 activity_done=activity_done,
             )
             st.success("Saved. You can update today's check-in anytime.")
+
+    st.caption("Explore Compass")
+    primary_links = (
+        ("🩺 Health", "Compass Health"),
+        ("📓 Journal", "Journal"),
+        ("💬 Companion", "Companion"),
+    )
+    secondary_links = (
+        ("💡 Insights", "Insights"),
+        ("📅 Weekly reflection", "Weekly reflection"),
+    )
+    for links in (primary_links, secondary_links):
+        cols = st.columns(len(links), gap="small")
+        for col, (label, destination) in zip(cols, links):
+            with col:
+                st.button(
+                    label,
+                    key=f"home_to_{destination.replace(' ', '_')}",
+                    use_container_width=True,
+                    on_click=lambda target=destination: st.session_state.update(
+                        compass_navigation=target
+                    ),
+                )
 
 elif page == "Journal":
     st.title("Your journal")

@@ -6,6 +6,7 @@ from compass.health import HealthService, ONBOARDING_STEPS
 from compass.health_history import list_saved_reports
 from compass.health_daily_ui import daily_screen, trends_screen
 from compass.health_weekly_ui import weekly_health_screen
+from compass.health_dashboard_ui import dashboard_screen
 from compass.health_reports import METRICS, extract_pdf_text, suggested_metrics, save_report
 from datetime import date
 from compass.resmed_ocr import recognize_resmed_pdf, parse_resmed_periods
@@ -22,9 +23,11 @@ def health_screen(db, user_id):
     step = min(profile["step"], len(ONBOARDING_STEPS) - 1)
 
     st.title("Your Health Journey")
-    onboarding_tab, daily_tab, trends_tab, weekly_tab, reports_tab, history_tab = st.tabs(
-        ["My health profile", "Daily check-in", "Trends", "Weekly review", "Sleep report imports", "Health history"]
+    dashboard_tab, onboarding_tab, daily_tab, trends_tab, weekly_tab, reports_tab, history_tab = st.tabs(
+        ["Overview", "My health profile", "Daily check-in", "Trends", "Weekly review", "Sleep report imports", "Health history"]
     )
+    with dashboard_tab:
+        dashboard_screen(db, user_id, date.today())
     with reports_tab:
         report_import_screen(db, user_id)
     with onboarding_tab:

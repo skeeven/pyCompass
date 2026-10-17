@@ -1,6 +1,7 @@
 """Streamlit home view for personal Compass Health observations."""
 
 import pandas as pd
+from datetime import timedelta
 import streamlit as st
 
 from compass.health_dashboard import dashboard_snapshot
@@ -89,7 +90,7 @@ def dashboard_screen(db, user_id, today):
     st.subheader("Recent daily measurements")
     from compass.health_daily import DailyHealthService
     history = DailyHealthService(db, user_id).history(
-        start=today - pd.Timedelta(days=6), end=today
+        start=today - timedelta(days=6), end=today
     )
     available = [
         key for key in ("sleep_hours", "energy", "weight_lb", "movement_minutes")

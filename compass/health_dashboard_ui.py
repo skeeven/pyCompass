@@ -5,6 +5,7 @@ from datetime import timedelta
 import streamlit as st
 
 from compass.health_dashboard import dashboard_snapshot
+from compass.health_goals import GOAL_OPTIONS, goal_progress
 
 SUMMARY_FIELDS = {
     "sleep_hours": ("Sleep", "hours"),
@@ -57,6 +58,21 @@ def dashboard_screen(db, user_id, today):
             st.write(snapshot["profile"]["answers"]["goals"])
     else:
         st.caption("Add personal goals in My health profile to see them here.")
+
+    configured = snapshot["profile"]["answers"].get("tracked_goals", {})
+    if configured:
+        st.subheader("Daily goal progress")
+        from compass.health_daily import DailyHealthService
+        logged = DailyHealthService(db, user_id).history(
+            start=today - timedelta(days=6), end=today
+        )
+        for key, status in goal_progress(logged, configured, today).items():
+            label, unit = GOAL_OPTIONS[key][:2]
+            st.write(
+                f"{label} {status['target']:g} {unit}: "
+                f"{status['met']} of {status['recorded']} measured days met"
+            )
+        st.caption("Unrecorded days are not treated as missed goals.")
 
     reflection = snapshot["reflection"]
     if reflection.get("next_step"):

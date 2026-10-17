@@ -252,6 +252,30 @@ if page == "Compass Health":
 elif page == "Today":
     st.title("A moment for you")
     st.caption(today.strftime("%A, %B %d, %Y"))
+
+    st.caption("Explore Compass")
+    primary_links = (
+        ("🩺 Health", "Compass Health"),
+        ("📓 Journal", "Journal"),
+        ("💬 Companion", "Companion"),
+    )
+    secondary_links = (
+        ("💡 Insights", "Insights"),
+        ("📅 Weekly reflection", "Weekly reflection"),
+    )
+    for links in (primary_links, secondary_links):
+        cols = st.columns(len(links), gap="small")
+        for col, (label, destination) in zip(cols, links):
+            with col:
+                st.button(
+                    label,
+                    key=f"home_to_{destination.replace(' ', '_')}",
+                    use_container_width=True,
+                    on_click=lambda target=destination: st.session_state.update(
+                        compass_navigation=target
+                    ),
+                )
+
     existing = next(
         (row for row in repo.rows("checkins") if row["day"] == today.isoformat()),
         {},
@@ -325,28 +349,6 @@ elif page == "Today":
             )
             st.success("Saved. You can update today's check-in anytime.")
 
-    st.caption("Explore Compass")
-    primary_links = (
-        ("🩺 Health", "Compass Health"),
-        ("📓 Journal", "Journal"),
-        ("💬 Companion", "Companion"),
-    )
-    secondary_links = (
-        ("💡 Insights", "Insights"),
-        ("📅 Weekly reflection", "Weekly reflection"),
-    )
-    for links in (primary_links, secondary_links):
-        cols = st.columns(len(links), gap="small")
-        for col, (label, destination) in zip(cols, links):
-            with col:
-                st.button(
-                    label,
-                    key=f"home_to_{destination.replace(' ', '_')}",
-                    use_container_width=True,
-                    on_click=lambda target=destination: st.session_state.update(
-                        compass_navigation=target
-                    ),
-                )
 
 elif page == "Journal":
     st.title("Your journal")

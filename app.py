@@ -38,7 +38,7 @@ st.markdown(
     """<style>
     .stApp {background: #f7faf8;}
     h1, h2, h3 {color: #214e43;}
-    .block-container {max-width: 850px; padding-top: 1.25rem;}\n    div[data-testid="stVerticalBlock"] {gap: 0.55rem;}\n    div[data-testid="stForm"] {padding: 0.9rem 1rem; border-radius: 14px;}
+    .block-container {max-width: 850px; padding-top: 1.25rem;}\n    div[data-testid="stForm"] {padding: 0.9rem 1rem; border-radius: 14px;}
     div[data-testid="stMetric"] {background: #eaf3ef; padding: 1rem;
       border-radius: 12px;}
     @media (max-width: 640px) {

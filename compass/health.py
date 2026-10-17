@@ -11,7 +11,7 @@ ALLOWED_FIELDS = {
     "age", "height_cm", "starting_weight_lb", "activity_level",
     "priorities", "usual_bedtime", "usual_wake_time", "sleep_quality",
     "uses_cpap", "medications", "supplements", "health_notes",
-    "barriers", "personal_time_minutes", "goals",
+    "barriers", "personal_time_minutes", "goals", "tracked_goals",
 }
 
 
@@ -47,6 +47,9 @@ class HealthService:
             raise ValueError("Unknown health profile field.")
         if not isinstance(step, int) or not 0 <= step < len(ONBOARDING_STEPS):
             raise ValueError("Invalid onboarding step.")
+        if "tracked_goals" in answers:
+            from compass.health_goals import validate_goals
+            validate_goals(answers["tracked_goals"])
         encoded = json.dumps(answers, ensure_ascii=False)
         if len(encoded) > 20000:
             raise ValueError("Health profile is too large.")

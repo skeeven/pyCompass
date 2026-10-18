@@ -31,13 +31,14 @@ def open_app(monkeypatch, db):
     return app
 
 
-def test_landing_shortcut_navigation(monkeypatch, users):
+def test_navigation_buttons_on_every_page(monkeypatch, users):
+    """Every main page offers shared navigation, including a way Home."""
     first, _ = users
     app = open_app(monkeypatch, first.db)
     app.session_state["user_id"] = first.user_id
     app.run()
     shortcuts = (
-        ("home_to_Compass_Health", "Compass Health"),
+        ("home_to_Health", "Health"),
         ("home_to_Journal", "Journal"),
         ("home_to_Companion", "Companion"),
         ("home_to_Insights", "Insights"),
@@ -47,5 +48,17 @@ def test_landing_shortcut_navigation(monkeypatch, users):
         app.button(key=key).click().run()
         assert not app.exception
         assert app.session_state["compass_navigation"] == destination
-        app.radio(key="compass_navigation").set_value("Today").run()
+        assert app.button(key="home_to_Today")
+        app.button(key="home_to_Today").click().run()
         assert not app.exception
+        assert app.session_state["compass_navigation"] == "Today"
+
+
+def test_sidebar_uses_short_health_label(monkeypatch, users):
+    first, _ = users
+    app = open_app(monkeypatch, first.db)
+    app.session_state["user_id"] = first.user_id
+    app.run()
+    choices = app.radio(key="compass_navigation").options
+    assert "Health" in choices
+    assert "Compass Health" not in choices

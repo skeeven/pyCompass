@@ -6,7 +6,7 @@ import fitz
 import pytest
 
 from compass.health_history import delete_saved_report, list_saved_reports
-from compass.health_reports import save_report
+from compass.health_reports import save_report, suggested_metrics
 from compass.sleep_cycle_ocr import recognize_sleep_cycle_pdf
 
 
@@ -87,3 +87,8 @@ def test_sleep_cycle_scanned_pdf_ocr_uses_ephemeral_text(monkeypatch):
     result = recognize_sleep_cycle_pdf(data)
     assert "Sleep Cycle" in result
     assert "7 hours" in result
+
+
+def test_sleep_cycle_suggestion_requires_average_sleep_units():
+    assert suggested_metrics("Average sleep 7.5 hours")["sleep_hours"] == 7.5
+    assert "sleep_hours" not in suggested_metrics("Total sleep 7.5 hours")

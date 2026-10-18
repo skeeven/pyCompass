@@ -4,7 +4,6 @@ import streamlit as st
 
 from compass.health_weekly import WeeklyHealthService, week_bounds
 from compass.health import HealthService
-from compass.health_daily_ui import NUMERIC_FIELDS
 from compass.health_weekly_summary import MEASURES
 from compass.health_report_display import format_duration
 
@@ -17,35 +16,7 @@ def weekly_health_screen(db, user_id, today):
         key="health_weekly_date",
     )
     start, end = week_bounds(selected)
-    overview = service.overview(selected, today=today)
-    st.caption(
-        f"{start:%b %d} – {end:%b %d, %Y} · "
-        f"{overview['days_logged']} daily check-ins recorded"
-    )
-    if overview["averages"]:
-        labels = {key: label for key, label, *_ in NUMERIC_FIELDS}
-        st.write("**This week's recorded measurements**")
-        for key, average in overview["averages"].items():
-            count = overview["measurement_counts"][key]
-            st.write(f"{labels[key]}: {average:.1f} · {count} recorded day(s)")
-        st.caption(
-            "These are averages of entries with values, not estimates for missing days."
-        )
-    else:
-        st.info("No daily measurements for this week yet.")
-
-    if overview["reports"]:
-        with st.expander("Imported sleep reports covering this week"):
-            st.caption(
-                "These reports are period summaries, sometimes overlapping. "
-                "They are not added to the daily averages above."
-            )
-            for report in overview["reports"]:
-                st.write(
-                    f"{report['source']}: {report['period_start']} – "
-                    f"{report['period_end']}"
-                )
-
+    st.caption(f"Week of {start:%b %d} – {min(end, today):%b %d, %Y}")
     review = service.personalized_overview(selected, today=today)
     st.markdown("### Your week at a glance")
     st.caption(

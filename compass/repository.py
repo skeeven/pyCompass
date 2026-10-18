@@ -9,7 +9,7 @@ from compass.journal import normalize_tags
 TABLES = {"checkins", "journal", "messages", "insights"}
 HEALTH_TABLES = {
     "health_profiles", "health_daily_logs", "health_reports",
-    "health_report_metrics", "health_weekly_reviews",
+    "health_report_metrics", "health_weekly_reviews", "sleep_cycle_sessions",
 }
 
 
@@ -41,6 +41,7 @@ class Repository:
             "health_profiles": "user_id",
             "health_reports": "uploaded_at, id",
             "health_report_metrics": "id",
+            "sleep_cycle_sessions": "night, session_start",
         }.get(table, "created_at, id")
         with self.db.connect() as conn:
             cursor = conn.execute(
@@ -207,7 +208,8 @@ class Repository:
             )
             for table in (
                 "health_report_metrics", "health_reports",
-                "health_weekly_reviews", "health_daily_logs", "health_profiles"
+                "health_weekly_reviews", "health_daily_logs", "health_profiles",
+                "sleep_cycle_sessions"
             ):
                 conn.execute(
                     f"DELETE FROM {table} WHERE user_id = ?",

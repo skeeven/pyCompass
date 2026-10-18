@@ -14,6 +14,7 @@ FIELDS = {
     "hunger": (1, 10),
     "movement_minutes": (0, 1440),
     "downtime_minutes": (0, 1440),
+    "nutrition_on_track": (0, 1),
     "nutrition_note": None,
     "notes": None,
 }

@@ -95,7 +95,9 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
             (id, user_id, uploaded_at, filename, report_type, status,
              period_start, period_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (report_id, user_id, datetime.now(timezone.utc).isoformat(),
-             "ResMed report.pdf" if kind == "ResMed CPAP" else "Sleep Cycle report.pdf",
+             ("ResMed report.pdf" if kind == "ResMed CPAP"
+              else "Sleep Cycle quality chart" if "sleep_quality_pct" in metrics
+              else "Sleep Cycle report.pdf"),
              kind, "verified", start.isoformat(), end.isoformat()),
         )
         for key, value in metrics.items():

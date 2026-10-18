@@ -10,9 +10,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 class Settings:
     """Runtime credentials and application settings."""
 
-    database_url: str = ""
+    database_url: str = field(default="", repr=False)
     database_path: str = "data/compass.db"
-    openai_api_key: str = ""
+    openai_api_key: str = field(default="", repr=False)
     openai_model: str = "gpt-4.1-mini"
     timezone: str = "America/Denver"
     allow_registration: bool = True

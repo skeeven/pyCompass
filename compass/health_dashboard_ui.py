@@ -6,6 +6,8 @@ import streamlit as st
 
 from compass.health_dashboard import dashboard_snapshot
 from compass.health_goals import GOAL_OPTIONS, goal_progress
+from compass.sleep_insights_ui import sleep_insights_screen
+from compass.health_report_display import format_report_value
 
 SUMMARY_FIELDS = {
     "sleep_hours": ("Sleep", "hours"),
@@ -81,8 +83,10 @@ def dashboard_screen(db, user_id, today):
     else:
         st.caption("Your next step from Weekly review will appear here.")
 
-    report = snapshot["latest_report"]
-    st.subheader("Latest verified sleep report")
+    sleep_insights_screen(snapshot["sleep_cycle"])
+
+    report = snapshot["latest_cpap_report"]
+    st.subheader("Latest ResMed CPAP report")
     if report:
         st.caption(
             f"{report['report_type']} · {report['period_start']} – "
@@ -95,18 +99,15 @@ def dashboard_screen(db, user_id, today):
                 metric = report["metrics"][key]
                 entries.append((label, metric["value"], metric["unit"]))
         for label, value, unit in entries:
-            st.write(f"{label}: {value:.2f} {unit}")
-        quality = report["metrics"].get("sleep_quality_pct")
-        if quality is not None:
-            st.write(f"Sleep quality: {quality['value']:.1f}%")
-            if "estimated" in quality["source"]:
-                st.caption("Sleep quality is a user-entered chart estimate.")
+            display = (format_report_value("cpap_usage_hours", value)
+                       if label == "CPAP average usage" else f"{value:.2f} {unit}")
+            st.write(f"{label}: {display}")
         st.caption(
             "This is an aggregate for its stated report period, not a daily "
             "reading or a medical interpretation. Full records are in Health history."
         )
     else:
-        st.caption("No verified sleep report yet.")
+        st.caption("No verified ResMed CPAP report yet.")
 
     st.subheader("Recent daily measurements")
     from compass.health_daily import DailyHealthService

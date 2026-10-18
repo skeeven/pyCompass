@@ -1,9 +1,12 @@
 """Streamlit guided onboarding for Compass Health."""
 
+import re
+
 import streamlit as st
 
 from compass.health import HealthService, ONBOARDING_STEPS
 from compass.health_history import list_saved_reports, delete_saved_report
+from compass.health_report_display import format_duration, format_report_value, duplicate_import_message
 from compass.health_daily_ui import daily_screen, trends_screen
 from compass.health_weekly_ui import weekly_health_screen
 from compass.health_dashboard_ui import dashboard_screen
@@ -204,13 +207,27 @@ def resmed_review_screen(db, user_id, upload):
                 label, unit = METRICS[name]
                 denominator = period["denominators"].get(name)
                 suffix = f" (out of {denominator} nights)" if denominator is not None else ""
-                fields[name] = st.number_input(
-                    f"{label} ({unit}){suffix}",
-                    value=float(suggested),
-                    min_value=0.0,
-                    step=0.01 if name in {"ahi", "leak_l_min"} else 0.1,
-                    key=f"resmed_{idx}_{name}",
-                )
+                if name in {"nights_over_four_hours", "nights_over_six_hours"}:
+                    fields[name] = st.number_input(
+                        f"{label}{suffix}",
+                        value=int(suggested),
+                        min_value=0,
+                        step=1,
+                        format="%d",
+                        key=f"resmed_{idx}_{name}",
+                    )
+                    if denominator is not None:
+                        st.caption(f"{int(fields[name])} of {denominator} nights")
+                else:
+                    fields[name] = st.number_input(
+                        f"{label} ({unit})",
+                        value=float(suggested),
+                        min_value=0.0,
+                        step=0.01 if name in {"ahi", "leak_l_min"} else 0.01,
+                        key=f"resmed_{idx}_{name}",
+                    )
+                    if name == "cpap_usage_hours":
+                        st.caption(f"Time: {format_duration(fields[name])}")
             confirmed_metrics.append(fields)
         confirmed = st.checkbox(
             "I checked each reporting period, value, and unit against the PDF."
@@ -238,13 +255,12 @@ def resmed_review_screen(db, user_id, upload):
                     st.error(f"{period['start']} – {period['end']}: {exc}")
             else:
                 saved += 1
-        if saved:
-            st.success(f"Saved {saved} verified period(s). No PDF was retained.")
-        if skipped:
-            st.warning(
-                f"Skipped {skipped} previously imported period(s). "
-                "Delete existing records in Health history before replacing them."
-            )
+        if saved or skipped:
+            message = duplicate_import_message(saved, skipped)
+            if saved:
+                st.success(message + " No PDF was retained.")
+            else:
+                st.info(message)
 
 
 def report_history_screen(db, user_id):
@@ -275,15 +291,13 @@ def report_history_screen(db, user_id):
             for key, info in report["metrics"].items():
                 label, unit = METRICS[key]
                 value = info["value"]
-                display = (
-                    f"{value:.2f}" if key in {"ahi", "leak_l_min"}
-                    else f"{value:.2f}" if key.endswith("_hours")
-                    else str(int(value))
-                )
+                match = re.search(r"/(\\d+) nights", info["source"])
+                denominator = int(match.group(1)) if match else None
+                display = format_report_value(key, value, denominator)
                 rows.append({
                     "Measurement": label,
                     "Value": display,
-                    "Unit": unit,
+                    "Unit": "" if key == "cpap_usage_hours" or key.startswith("nights_over_") else unit,
                     "Details": info["source"],
                 })
             if rows:

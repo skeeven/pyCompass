@@ -6,6 +6,8 @@ from compass.health import HealthService
 from compass.health_daily import DailyHealthService, weekly_summary
 from compass.health_history import list_saved_reports
 from compass.health_weekly import WeeklyHealthService
+from compass.sleep_cycle_csv import SleepCycleCSVService
+from compass.sleep_insights import sleep_cycle_insights
 
 
 def dashboard_snapshot(db, user_id, today):
@@ -22,6 +24,11 @@ def dashboard_snapshot(db, user_id, today):
         report for report in list_saved_reports(db, user_id)
         if report["status"] == "verified" and report["period_end"] <= today.isoformat()
     ]
+    cpap_reports = [r for r in reports if r["report_type"] == "ResMed CPAP"]
+    cpap_reports.sort(
+        key=lambda report: (report["period_end"], report["uploaded_at"]),
+        reverse=True,
+    )
     reports.sort(
         key=lambda report: (report["period_end"], report["uploaded_at"]),
         reverse=True,
@@ -32,4 +39,10 @@ def dashboard_snapshot(db, user_id, today):
         "profile": profile,
         "reflection": weekly_review,
         "latest_report": reports[0] if reports else None,
+        "latest_cpap_report": cpap_reports[0] if cpap_reports else None,
+        "sleep_cycle": sleep_cycle_insights(
+            SleepCycleCSVService(db, user_id).history(
+                start=today - timedelta(days=89), end=today
+            ), today,
+        ),
     }

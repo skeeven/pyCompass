@@ -25,14 +25,19 @@ def _date(value):
 
 def recognize_resmed_pdf(data):
     """OCR the PDF as displayed, bypassing broken embedded font character maps."""
-    if len(data) > 8 * 1024 * 1024:
-        raise ValueError("PDF exceeds the 8 MB limit.")
+    if not data or len(data) > 8 * 1024 * 1024:
+        raise ValueError("PDF must be non-empty and at most 8 MB.")
     try:
         doc = fitz.open(stream=data, filetype="pdf")
         if doc.needs_pass or len(doc) > 3:
             raise ValueError("Use an unlocked ResMed PDF with at most 3 pages.")
         parts = []
         for page in doc:
+            # Avoid extremely large/hostile page sizes exhausting server memory.
+            if page.rect.width <= 0 or page.rect.height <= 0:
+                raise ValueError("PDF page dimensions are invalid.")
+            if page.rect.width * page.rect.height * 9 > 20_000_000:
+                raise ValueError("PDF page is too large to process safely.")
             pix = page.get_pixmap(matrix=fitz.Matrix(3, 3), alpha=False)
             img = Image.open(io.BytesIO(pix.tobytes("png")))
             parts.append(pytesseract.image_to_string(img, config="--psm 3"))

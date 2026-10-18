@@ -6,11 +6,11 @@ import streamlit as st
 
 from compass.health_dashboard import dashboard_snapshot
 from compass.health_goals import GOAL_OPTIONS, goal_progress
-from compass.sleep_insights_ui import sleep_insights_screen
+from compass.unified_sleep_ui import unified_sleep_screen
 from compass.health_report_display import format_report_value
 
 SUMMARY_FIELDS = {
-    "sleep_hours": ("Sleep", "hours"),
+    "sleep_hours": ("Manual sleep", "hours"),
     "cpap_hours": ("CPAP use", "hours"),
     "energy": ("Energy", "/10"),
     "stress": ("Stress", "/10"),
@@ -30,7 +30,7 @@ def dashboard_screen(db, user_id, today):
         cards = [
             (label, f"{latest[key]:.1f} {unit}")
             for key, (label, unit) in SUMMARY_FIELDS.items()
-            if key in latest
+            if key in latest and key not in {"sleep_hours", "cpap_hours"}
         ]
         if cards:
             for i in range(0, len(cards), 3):
@@ -51,7 +51,7 @@ def dashboard_screen(db, user_id, today):
     metrics = summary["averages"]
     if metrics:
         cols = st.columns(3)
-        for index, key in enumerate(("sleep_hours", "energy", "movement_minutes")):
+        for index, key in enumerate(("energy", "movement_minutes", "downtime_minutes")):
             if key in metrics:
                 label, unit = SUMMARY_FIELDS[key]
                 cols[index].metric(f"Average {label.lower()}", f"{metrics[key]:.1f} {unit}")
@@ -83,39 +83,15 @@ def dashboard_screen(db, user_id, today):
     else:
         st.caption("Your next step from Weekly review will appear here.")
 
-    sleep_insights_screen(snapshot["sleep_cycle"])
+    unified_sleep_screen(snapshot["unified_sleep"])
 
-    report = snapshot["latest_cpap_report"]
-    st.subheader("Latest ResMed CPAP report")
-    if report:
-        st.caption(
-            f"{report['report_type']} · {report['period_start']} – "
-            f"{report['period_end']}"
-        )
-        entries = []
-        for key, label in (("cpap_usage_hours", "CPAP average usage"),
-                           ("ahi", "AHI"), ("leak_l_min", "95th percentile leak")):
-            if key in report["metrics"]:
-                metric = report["metrics"][key]
-                entries.append((label, metric["value"], metric["unit"]))
-        for label, value, unit in entries:
-            display = (format_report_value("cpap_usage_hours", value)
-                       if label == "CPAP average usage" else f"{value:.2f} {unit}")
-            st.write(f"{label}: {display}")
-        st.caption(
-            "This is an aggregate for its stated report period, not a daily "
-            "reading or a medical interpretation. Full records are in Health history."
-        )
-    else:
-        st.caption("No verified ResMed CPAP report yet.")
-
-    st.subheader("Recent daily measurements")
+    st.subheader("Other daily measurements")
     from compass.health_daily import DailyHealthService
     history = DailyHealthService(db, user_id).history(
         start=today - timedelta(days=6), end=today
     )
     available = [
-        key for key in ("sleep_hours", "energy", "weight_lb", "movement_minutes")
+        key for key in ("energy", "weight_lb", "movement_minutes", "stress")
         if any(key in record for record in history)
     ]
     if available:
@@ -129,4 +105,4 @@ def dashboard_screen(db, user_id, today):
         st.line_chart(frame[["day", selected]].dropna().set_index("day"))
         st.caption("Only recorded days are plotted; no values are inferred.")
     else:
-        st.caption("Record numeric daily measurements to display a chart.")
+        st.caption("Record non-sleep daily measurements to display a chart.")

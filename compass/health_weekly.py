@@ -5,6 +5,9 @@ from datetime import date, timedelta
 
 from compass.health_daily import DailyHealthService, weekly_summary
 from compass.health_history import list_saved_reports
+from compass.health import HealthService
+from compass.sleep_cycle_csv import SleepCycleCSVService
+from compass.health_weekly_summary import personalized_weekly_summary
 
 FIELDS = ("wins", "challenges", "next_step")
 
@@ -55,6 +58,25 @@ class WeeklyHealthService:
             and r["period_start"] <= end.isoformat()
         ]
         return summary
+
+    def personalized_overview(self, day, today=None):
+        start, end = week_bounds(day)
+        limit = today or date.today()
+        if start > limit:
+            raise ValueError("Week hasn't started.")
+        end = min(end, limit)
+        previous_start = start - timedelta(days=7)
+        manual = self.daily.history(start=previous_start, end=end)
+        sessions = SleepCycleCSVService(self.db, self.user_id).history(
+            start=previous_start, end=end
+        )
+        reports = list_saved_reports(self.db, self.user_id)
+        goals = HealthService(self.db, self.user_id).load()["answers"].get(
+            "tracked_goals", {}
+        )
+        return personalized_weekly_summary(
+            manual, sessions, reports, goals, start, end
+        )
 
     def get(self, day):
         start, _ = week_bounds(day)

@@ -99,16 +99,20 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
              kind, "verified", start.isoformat(), end.isoformat()),
         )
         for key, value in metrics.items():
+            if estimated and key == "sleep_quality_pct":
+                source = "User-estimated chart period average (not an exact app reading)"
+            elif key in denominators and denominators[key] is not None:
+                source = (
+                    "User verified period aggregate; "
+                    f"{int(value)}/{denominators[key]} nights"
+                )
+            else:
+                source = "User verified period aggregate"
             conn.execute(
                 """INSERT INTO health_report_metrics
                 (id, report_id, user_id, metric_name, metric_value, unit, source_label)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (str(uuid4()), report_id, user_id, key, float(value),
-                 METRICS[key][1],
-                 ("User-estimated chart period average" if estimated and key == "sleep_quality_pct"
-                  else "User verified period aggregate; " +
-                  f"{int(value)}/{denominators[key]} nights")
-                 if key in denominators and denominators[key] is not None
-                  else "User verified period aggregate"),
+                 METRICS[key][1], source),
             )
     return report_id

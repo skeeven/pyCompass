@@ -16,6 +16,7 @@ def cycle_row(day, hours, quality):
         "session_end": f"{day} 07:00:00",
         "sleep_hours": hours,
         "sleep_quality_pct": quality,
+        "time_in_bed_hours": None,
     }
 
 

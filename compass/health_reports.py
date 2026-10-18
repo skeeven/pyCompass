@@ -69,12 +69,15 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
         raise ValueError("Choose a valid report date range.")
     if not metrics or set(metrics) - set(METRICS):
         raise ValueError("Select at least one supported metric.")
+    if "sleep_quality_pct" in metrics:
+        quality = metrics["sleep_quality_pct"]
+        if (kind != "Sleep Cycle" or isinstance(quality, bool)
+                or not isinstance(quality, (float, int))
+                or not 0 <= quality <= 100):
+            raise ValueError("Sleep quality must be a Sleep Cycle percentage from 0 to 100.")
     for key, value in metrics.items():
         if not isinstance(value, (float, int)) or not 0 <= value <= 10000:
             raise ValueError("Invalid metric value.")
-    if "sleep_quality_pct" in metrics:
-        if kind != "Sleep Cycle" or not 0 <= metrics["sleep_quality_pct"] <= 100:
-            raise ValueError("Sleep quality must be a Sleep Cycle percentage from 0 to 100.")
     denominators = denominators or {}
     with db.connect() as conn:
         if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():

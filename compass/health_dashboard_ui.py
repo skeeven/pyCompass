@@ -96,6 +96,11 @@ def dashboard_screen(db, user_id, today):
                 entries.append((label, metric["value"], metric["unit"]))
         for label, value, unit in entries:
             st.write(f"{label}: {value:.2f} {unit}")
+        quality = report["metrics"].get("sleep_quality_pct")
+        if quality is not None:
+            st.write(f"Sleep quality: {quality['value']:.1f}%")
+            if "estimated" in quality["source"]:
+                st.caption("Sleep quality is a user-entered chart estimate.")
         st.caption(
             "This is an aggregate for its stated report period, not a daily "
             "reading or a medical interpretation. Full records are in Health history."

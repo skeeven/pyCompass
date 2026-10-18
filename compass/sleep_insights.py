@@ -81,6 +81,7 @@ def sleep_cycle_insights(rows, today):
     recent = [row for row in available if row["night"] >= recent_start]
     return {
         "latest": available[-1] if available else None,
+        "as_of": today.isoformat(),
         "windows": windows,
         "comparison": comparison,
         "bedtime": _clock_summary([

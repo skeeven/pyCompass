@@ -198,7 +198,7 @@ with st.sidebar:
         "Your space",
         [
             "Today",
-            "Compass Health",
+            "Health",
             "Journal",
             "Companion",
             "Insights",
@@ -246,35 +246,44 @@ def run_reflection(context, kind):
         )
 
 
-if page == "Compass Health":
+def render_navigation():
+    """Shared navigation available on every authenticated Compass page."""
+    st.caption("Explore Compass")
+    groups = (
+        (
+            ("🏠 Home", "Today"),
+            ("🩺 Health", "Health"),
+            ("📓 Journal", "Journal"),
+        ),
+        (
+            ("💬 Companion", "Companion"),
+            ("💡 Insights", "Insights"),
+            ("📅 Weekly reflection", "Weekly reflection"),
+        ),
+    )
+    for group in groups:
+        columns = st.columns(len(group), gap="small")
+        for column, (label, destination) in zip(columns, group):
+            with column:
+                st.button(
+                    label,
+                    key=f"home_to_{destination.replace(' ', '_')}",
+                    use_container_width=True,
+                    disabled=page == destination,
+                    on_click=lambda target=destination: st.session_state.update(
+                        compass_navigation=target
+                    ),
+                )
+
+
+render_navigation()
+
+if page == "Health":
     health_screen(db, repo.user_id)
 
 elif page == "Today":
     st.title("A moment for you")
     st.caption(today.strftime("%A, %B %d, %Y"))
-
-    st.caption("Explore Compass")
-    primary_links = (
-        ("🩺 Health", "Compass Health"),
-        ("📓 Journal", "Journal"),
-        ("💬 Companion", "Companion"),
-    )
-    secondary_links = (
-        ("💡 Insights", "Insights"),
-        ("📅 Weekly reflection", "Weekly reflection"),
-    )
-    for links in (primary_links, secondary_links):
-        cols = st.columns(len(links), gap="small")
-        for col, (label, destination) in zip(cols, links):
-            with col:
-                st.button(
-                    label,
-                    key=f"home_to_{destination.replace(' ', '_')}",
-                    use_container_width=True,
-                    on_click=lambda target=destination: st.session_state.update(
-                        compass_navigation=target
-                    ),
-                )
 
     existing = next(
         (row for row in repo.rows("checkins") if row["day"] == today.isoformat()),

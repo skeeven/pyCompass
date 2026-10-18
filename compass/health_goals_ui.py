@@ -120,12 +120,13 @@ def comparison_screen(db, user_id, today):
     )
     from compass.health_daily_ui import NUMERIC_FIELDS
     labels = {key: label for key, label, *_ in NUMERIC_FIELDS}
+    labels["nutrition_on_track"] = "Nutrition plan followed (1=yes, 0=no)"
     if not data["comparisons"]:
         st.info("Log the same measurement in both weeks to compare averages.")
         return
     for key, stats in sorted(data["comparisons"].items()):
         st.write(
-            f"**{labels[key]}:** {stats['previous']:.1f} → "
+            f"**{labels.get(key, key)}:** {stats['previous']:.1f} → "
             f"{stats['current']:.1f} (change {stats['change']:+.1f}). "
             f"Recorded on {stats['previous_count']} and "
             f"{stats['current_count']} day(s), respectively."

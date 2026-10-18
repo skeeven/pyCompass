@@ -49,6 +49,7 @@ def suggested_metrics(text):
     """Conservative suggestions; all values must be confirmed by the user."""
     patterns = {
         "ahi": r"\b(?:AHI|apnea.hypopnea index)\s*[:=]?\s*(\d+(?:\.\d+)?)\b",
+        "sleep_hours": r"\b(?:average sleep|average sleep duration)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(?:h|hours?)\b",
         "leak_l_min": r"\b(?:95th percentile leak|mask leak)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(?:L/min|lpm)\b",
     }
     values = {}

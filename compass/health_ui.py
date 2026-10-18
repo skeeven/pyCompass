@@ -3,7 +3,7 @@
 import streamlit as st
 
 from compass.health import HealthService, ONBOARDING_STEPS
-from compass.health_history import list_saved_reports
+from compass.health_history import list_saved_reports, delete_saved_report
 from compass.health_daily_ui import daily_screen, trends_screen
 from compass.health_weekly_ui import weekly_health_screen
 from compass.health_dashboard_ui import dashboard_screen
@@ -11,6 +11,7 @@ from compass.health_goals_ui import goals_screen, comparison_screen
 from compass.health_reports import METRICS, extract_pdf_text, suggested_metrics, save_report
 from datetime import date
 from compass.resmed_ocr import recognize_resmed_pdf, parse_resmed_periods
+from compass.sleep_cycle_ocr import recognize_sleep_cycle_pdf
 
 PRIORITIES = ["Sleep", "Energy", "Weight", "Nutrition", "Movement", "Stress", "Other"]
 ACTIVITY = ["Prefer not to say", "Mostly seated", "Lightly active", "Moderately active", "Very active"]
@@ -108,7 +109,7 @@ def onboarding_screen(service, profile, answers, step):
 
 def report_import_screen(db, user_id):
     st.subheader("Import a sleep report")
-    st.caption("ResMed reports are read with OCR; Sleep Cycle supports text-based PDFs. Original PDFs are not saved.")
+    st.caption("ResMed reports use OCR; Sleep Cycle uses embedded text or OCR when necessary. Original PDFs are not saved.")
     kind = st.selectbox("Report source", ["ResMed CPAP", "Sleep Cycle"])
     upload = st.file_uploader("Choose a PDF (8 MB maximum)", type=["pdf"])
     if upload is None:
@@ -118,10 +119,24 @@ def report_import_screen(db, user_id):
         return
     try:
         text = extract_pdf_text(upload.getvalue())
+        extraction_method = "embedded PDF text"
     except ValueError as exc:
-        st.warning(str(exc))
-        return
-    st.info("Review the report text and enter the period covered. Suggestions may be wrong.")
+        # Only fall back when text is unavailable/unsupported; do not bypass
+        # file size, password or page-count safety validation.
+        if "No selectable text" not in str(exc) and "needs OCR" not in str(exc):
+            st.warning(str(exc))
+            return
+        try:
+            with st.spinner("Reading Sleep Cycle report visually (OCR)..."):
+                text = recognize_sleep_cycle_pdf(upload.getvalue())
+            extraction_method = "OCR"
+        except ValueError as ocr_exc:
+            st.warning(str(ocr_exc))
+            return
+    st.info(
+        f"Read using {extraction_method}. Review the report text and enter "
+        "the period covered. OCR and metric suggestions may be wrong."
+    )
     with st.expander("View extracted text (not saved)", expanded=False):
         st.text_area("PDF text", text, height=220, disabled=True)
     suggestions = suggested_metrics(text)
@@ -208,13 +223,28 @@ def resmed_review_screen(db, user_id, upload):
         if any(not metrics for metrics in confirmed_metrics):
             st.warning("One or more periods have no recognized measurements.")
             return
+        saved, skipped = 0, 0
         for period, metrics in zip(periods, confirmed_metrics):
-            save_report(
-                db, user_id, upload.name, "ResMed CPAP",
-                period["start"], period["end"], metrics,
-                denominators=period["denominators"],
+            try:
+                save_report(
+                    db, user_id, upload.name, "ResMed CPAP",
+                    period["start"], period["end"], metrics,
+                    denominators=period["denominators"],
+                )
+            except ValueError as exc:
+                if "already saved" in str(exc):
+                    skipped += 1
+                else:
+                    st.error(f"{period['start']} – {period['end']}: {exc}")
+            else:
+                saved += 1
+        if saved:
+            st.success(f"Saved {saved} verified period(s). No PDF was retained.")
+        if skipped:
+            st.warning(
+                f"Skipped {skipped} previously imported period(s). "
+                "Delete existing records in Health history before replacing them."
             )
-        st.success(f"Saved {len(periods)} verified reporting periods. No PDF was retained.")
 
 
 def report_history_screen(db, user_id):
@@ -260,3 +290,20 @@ def report_history_screen(db, user_id):
                 st.dataframe(rows, hide_index=True, use_container_width=True)
             else:
                 st.info("This reporting period has no recognized saved measurements.")
+            st.caption("Delete an incorrect period before importing its replacement.")
+            confirmation = st.checkbox(
+                "I understand this permanently removes this report period and its metrics",
+                key=f"confirm_report_delete_{report['id']}",
+            )
+            if st.button(
+                "Delete report period",
+                key=f"delete_report_{report['id']}",
+                disabled=not confirmation,
+            ):
+                try:
+                    delete_saved_report(db, user_id, report["id"])
+                except ValueError as exc:
+                    st.error(str(exc))
+                else:
+                    st.success("Report period deleted.")
+                    st.rerun()

@@ -37,3 +37,22 @@ def list_saved_reports(db, user_id):
         for report in reports:
             report["metrics"] = by_report[report["id"]]
     return reports
+
+
+def delete_saved_report(db, user_id, report_id):
+    """Delete only an owned imported period and its child measurements."""
+    with db.connect() as conn:
+        owned = conn.execute(
+            "SELECT 1 FROM health_reports WHERE id = ? AND user_id = ?",
+            (report_id, user_id),
+        ).fetchone()
+        if not owned:
+            raise ValueError("This report is unavailable.")
+        conn.execute(
+            "DELETE FROM health_report_metrics WHERE report_id = ? AND user_id = ?",
+            (report_id, user_id),
+        )
+        conn.execute(
+            "DELETE FROM health_reports WHERE id = ? AND user_id = ?",
+            (report_id, user_id),
+        )

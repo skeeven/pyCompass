@@ -52,7 +52,7 @@ SCHEMA = (
     "CREATE INDEX IF NOT EXISTS messages_owner ON messages(user_id)",
     "CREATE INDEX IF NOT EXISTS insights_owner ON insights(user_id)",
 )
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class Database:
@@ -226,5 +226,25 @@ class Database:
                 )
                 conn.execute(
                     "INSERT INTO schema_migrations (version) VALUES (4)"
+                )
+            if version < 5:
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS sleep_cycle_sessions (
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    session_start TEXT NOT NULL,
+                    session_end TEXT NOT NULL,
+                    night TEXT NOT NULL,
+                    sleep_quality_pct REAL,
+                    sleep_hours REAL,
+                    time_in_bed_hours REAL,
+                    PRIMARY KEY(user_id, session_start, session_end)
+                    )"""
+                )
+                conn.execute(
+                    """CREATE INDEX IF NOT EXISTS sleep_cycle_sessions_night
+                    ON sleep_cycle_sessions(user_id, night)"""
+                )
+                conn.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (5)"
                 )
 

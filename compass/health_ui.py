@@ -15,6 +15,7 @@ from compass.health_reports import METRICS, extract_pdf_text, suggested_metrics,
 from datetime import date
 from compass.resmed_ocr import recognize_resmed_pdf, parse_resmed_periods
 from compass.sleep_cycle_ocr import recognize_sleep_cycle_pdf
+from compass.sleep_quality_charts import sleep_quality_chart_preview
 
 PRIORITIES = ["Sleep", "Energy", "Weight", "Nutrition", "Movement", "Stress", "Other"]
 ACTIVITY = ["Prefer not to say", "Mostly seated", "Lightly active", "Moderately active", "Very active"]
@@ -114,11 +115,26 @@ def report_import_screen(db, user_id):
     st.subheader("Import a sleep report")
     st.caption("ResMed reports use OCR; Sleep Cycle uses embedded text or OCR when necessary. Original PDFs are not saved.")
     kind = st.selectbox("Report source", ["ResMed CPAP", "Sleep Cycle"])
-    upload = st.file_uploader("Choose a PDF (8 MB maximum)", type=["pdf"])
+    chart_mode = False
+    if kind == "Sleep Cycle":
+        chart_mode = st.radio(
+            "Sleep Cycle export type",
+            ["Sleep quality chart (JPG, PNG or PDF)", "Text-based sleep report (PDF)"],
+            horizontal=False,
+        ) == "Sleep quality chart (JPG, PNG or PDF)"
+    types = ["pdf", "jpg", "jpeg", "png"] if chart_mode else ["pdf"]
+    upload = st.file_uploader(
+        "Choose a chart or PDF (8 MB maximum)" if chart_mode else "Choose a PDF (8 MB maximum)",
+        type=types,
+        key="sleep_report_upload",
+    )
     if upload is None:
         return
     if kind == "ResMed CPAP":
         resmed_review_screen(db, user_id, upload)
+        return
+    if chart_mode:
+        sleep_quality_chart_screen(db, user_id, upload)
         return
     try:
         text = extract_pdf_text(upload.getvalue())
@@ -176,6 +192,70 @@ def report_import_screen(db, user_id):
         else:
             st.success("Verified period measurements saved. The PDF was not stored.")
 
+
+
+def sleep_quality_chart_screen(db, user_id, upload):
+    """Preview chart files and save only explicitly acknowledged manual values."""
+    try:
+        preview = sleep_quality_chart_preview(upload.getvalue(), upload.name)
+    except ValueError as exc:
+        st.warning(str(exc))
+        return
+    st.image(preview, caption="Sleep Cycle sleep quality chart (preview only)")
+    st.info(
+        "These charts show percentages as bars or a trend line, but do not print "
+        "exact nightly values or a precise period average. Compass cannot infer "
+        "a trustworthy score from their shapes. Enter a score only if you have "
+        "one from the app, or explicitly label your value as an estimate."
+    )
+    with st.form("sleep_quality_chart_confirmation"):
+        start = st.date_input(
+            "Chart period starts", value=date.today(),
+            key="sleep_quality_start",
+        )
+        end = st.date_input(
+            "Chart period ends", value=date.today(),
+            key="sleep_quality_end",
+        )
+        quality = st.number_input(
+            "Sleep quality for the period (%) — leave blank if unknown",
+            min_value=0.0, max_value=100.0, step=0.5, value=None,
+            key="sleep_quality_percent",
+        )
+        estimated = st.checkbox(
+            "This percentage is my estimate from the chart, not an exact app average.",
+            key="sleep_quality_estimated",
+        )
+        confirmed = st.checkbox(
+            "I checked the date range and percentage; do not store the original image.",
+            key="sleep_quality_confirmed",
+        )
+        submit = st.form_submit_button("Save sleep quality")
+    if submit:
+        if quality is None:
+            st.warning(
+                "No precise sleep quality score was provided. Nothing was saved. "
+                "The chart alone is not a numerical measurement."
+            )
+            return
+        if not confirmed:
+            st.warning("Confirm the reporting dates and percentage before saving.")
+            return
+        try:
+            save_report(
+                db, user_id, upload.name, "Sleep Cycle", start, end,
+                {"sleep_quality_pct": quality}, estimated=estimated,
+            )
+        except ValueError as exc:
+            if "already saved" in str(exc):
+                st.info("This Sleep Cycle period is already saved. No changes needed.")
+            else:
+                st.error(str(exc))
+        else:
+            st.success(
+                "Sleep quality saved for the selected period. "
+                "The original chart image was not retained."
+            )
 
 def resmed_review_screen(db, user_id, upload):
     """Present separately dated sections; never save without verification."""

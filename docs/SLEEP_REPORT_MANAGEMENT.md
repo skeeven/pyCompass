@@ -42,3 +42,30 @@ and deleting an incorrect period.
 **Limitations:** Text recognition and date/metric extraction depend
 on the Sleep Cycle export layout and scan quality. This project has
 not yet been verified with the user's actual Sleep Cycle PDF.
+
+
+## Sleep Cycle Sleep quality charts (JPG, PNG or image PDF)
+
+Choose **Sleep Cycle** → **Sleep quality chart (JPG, PNG or PDF)** in
+Health → Sleep report imports. Upload an individual chart screenshot, or
+a PDF created from the image. The first PDF page is shown as a temporary
+preview. The image/PDF is not persisted by Compass.
+
+The app's bar charts show approximate percentages over time, but do not
+print exact nightly readings or an exact period-wide average. OCR may
+recover headings and date labels, but cannot safely turn those bar heights
+or trend lines into accurate source measurements. For that reason,
+**no score or date range is inferred from a chart**.
+
+Enter the start/end dates visible or known from your app and supply a
+percentage only when you have an app-reported value or clearly intend
+a manual estimate. Mark **This percentage is my estimate** for graph-based
+approximations. Blank scores are not saved. An estimated percentage is
+explicitly labeled in Health history. This is a chart-period summary, not
+a nightly observation or clinically validated sleep measurement.
+
+The existing **Text-based sleep report (PDF)** mode remains available for
+Sleep Cycle exports that actually print measurements. Imported periods
+from both modes share the same duplicate detection: same user, source,
+start and end date cannot be imported twice. For multiple charts, import
+and verify each distinct period individually.

@@ -7,6 +7,7 @@ import streamlit as st
 from compass.health_dashboard import dashboard_snapshot
 from compass.health_goals import GOAL_OPTIONS, goal_progress
 from compass.unified_sleep_ui import unified_sleep_screen
+from compass.health_patterns_ui import personalized_patterns_screen
 from compass.health_report_display import format_report_value
 
 SUMMARY_FIELDS = {
@@ -84,6 +85,7 @@ def dashboard_screen(db, user_id, today):
         st.caption("Your next step from Weekly review will appear here.")
 
     unified_sleep_screen(snapshot["unified_sleep"])
+    personalized_patterns_screen(snapshot["personalized_insights"])
 
     st.subheader("Other daily measurements")
     from compass.health_daily import DailyHealthService

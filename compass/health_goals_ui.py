@@ -26,6 +26,10 @@ def goals_screen(db, user_id, today):
         values = {}
         for key in selected:
             label, unit, low, high = GOAL_OPTIONS[key]
+            if key == "nutrition_on_track":
+                values[key] = 1.0
+                st.caption("Nutrition: track whether you followed your own plan (Yes/No) in the full Daily check-in.")
+                continue
             values[key] = st.number_input(
                 f"{label} ({unit})",
                 min_value=float(low),

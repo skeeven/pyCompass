@@ -69,3 +69,21 @@ def test_sleep_cycle_ocr_limits_rendered_page_size():
     doc.close()
     with pytest.raises(ValueError, match="too large"):
         recognize_sleep_cycle_pdf(data)
+
+
+def test_sleep_cycle_scanned_pdf_ocr_uses_ephemeral_text(monkeypatch):
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=400)
+    page.draw_rect(fitz.Rect(20, 20, 200, 100), fill=(0, 0, 0))
+    data = doc.tobytes()
+    doc.close()
+    from compass import sleep_cycle_ocr
+
+    monkeypatch.setattr(
+        sleep_cycle_ocr.pytesseract,
+        "image_to_string",
+        lambda image, config: "Sleep Cycle\\nAverage sleep 7 hours",
+    )
+    result = recognize_sleep_cycle_pdf(data)
+    assert "Sleep Cycle" in result
+    assert "7 hours" in result

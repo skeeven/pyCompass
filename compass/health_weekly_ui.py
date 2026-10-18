@@ -5,6 +5,8 @@ import streamlit as st
 from compass.health_weekly import WeeklyHealthService, week_bounds
 from compass.health import HealthService
 from compass.health_daily_ui import NUMERIC_FIELDS
+from compass.health_weekly_summary import MEASURES
+from compass.health_report_display import format_duration
 
 
 def weekly_health_screen(db, user_id, today):
@@ -43,6 +45,82 @@ def weekly_health_screen(db, user_id, today):
                     f"{report['source']}: {report['period_start']} – "
                     f"{report['period_end']}"
                 )
+
+    review = service.personalized_overview(selected, today=today)
+    st.markdown("### Your week at a glance")
+    st.caption(
+        f"{review['current']['recorded_sleep_nights']} nights with recorded sleep · "
+        f"{review['current']['checkin_days']} manual check-ins. "
+        "Missing days are excluded, not treated as zero."
+    )
+    for key, measurement in review["current"]["measurements"].items():
+        label, unit = MEASURES[key]
+        value = (format_duration(measurement["average"])
+                 if key == "sleep_hours" else
+                 f"{measurement['average']:.1f} {unit}")
+        st.write(
+            f"**{label}:** {value} · "
+            f"{measurement['count']} recorded measurement(s)"
+        )
+    if not review["current"]["measurements"]:
+        st.info("No sleep or numeric wellness measurements for this week yet.")
+    if review["changes"]:
+        with st.expander("Compared with last week"):
+            st.caption(
+                "Changes are descriptive. Comparisons require at least two "
+                "observations in each week."
+            )
+            for key, change in sorted(review["changes"].items()):
+                label, unit = MEASURES[key]
+                if key == "sleep_hours":
+                    difference = f"{change['difference'] * 60:+.0f} minutes"
+                elif key == "sleep_quality_pct":
+                    difference = f"{change['difference']:+.1f} percentage points"
+                else:
+                    difference = f"{change['difference']:+.1f} {unit}"
+                st.write(
+                    f"{label}: **{difference}** · "
+                    f"{change['previous_count']} previous and "
+                    f"{change['current_count']} current measurements"
+                )
+    if review["goals"]:
+        st.markdown("### Progress toward your goals")
+        for key, result in review["goals"].items():
+            label = review["goal_labels"][key]
+            if key == "weight_lb":
+                if result["latest"] is None:
+                    st.write(f"**{label}:** No weight recorded this week.")
+                else:
+                    description = f"Latest {result['latest']:.1f} lb"
+                    if result["change"] is not None:
+                        description += f" · Change {result['change']:+.1f} lb"
+                    st.write(f"**{label}:** {description}")
+            else:
+                st.write(
+                    f"**{label}:** {result['met']} of "
+                    f"{result['recorded']} measured day(s) met your target"
+                )
+        st.caption(
+            "Goals use your configured targets and observed days only. "
+            "Sleep Cycle is used before manual sleep; ResMed period "
+            "averages aren't counted as nightly goal completions."
+        )
+    if review["report_context"]:
+        with st.expander("Sleep report context (not daily readings)"):
+            st.caption(
+                "Overlapping report periods are listed for context only. "
+                "They are not averaged into nightly data."
+            )
+            for item in review["report_context"]:
+                st.write(
+                    f"{item['source']}: {item['period_start']} to "
+                    f"{item['period_end']}"
+                )
+    st.caption(
+        "Your reflection below is written and saved by you. "
+        "Compass does not automatically invent wins, challenges, "
+        "or medical recommendations from these measurements."
+    )
 
     goals = HealthService(db, user_id).load()["answers"].get("goals")
     if goals:

@@ -86,7 +86,6 @@ def sleep_insights_screen(insights):
         )
         chart = pd.DataFrame(insights["chart_rows"])
         chart["night"] = pd.to_datetime(chart["night"])
-        last_night = pd.to_datetime(insights["chart_rows"][-1]["night"])
         # Keep the selected window anchored to the dashboard date rather
         # than the latest recorded session (which might be old).
         from datetime import date, timedelta

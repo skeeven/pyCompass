@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 
 from compass.health_daily import DailyHealthService, weekly_summary
+from compass.health_checkin_context import sleep_context_for_day, manual_checkin_patch
+from compass.health_report_display import format_duration
 
 NUMERIC_FIELDS = (
     ("weight_lb", "Weight (lb)", 50.0, 1000.0, 0.1),
@@ -32,14 +34,24 @@ def daily_screen(db, user_id, today):
         key="health_checkin_day",
     )
     existing = service.get(selected_day)
+    imported = sleep_context_for_day(db, user_id, selected_day)
+    if imported['session_count']:
+        details = []
+        if imported['sleep_hours'] is not None:
+            details.append('Time asleep: ' + format_duration(imported['sleep_hours']))
+        if imported['sleep_quality_pct'] is not None:
+            details.append(f"Quality: {imported['sleep_quality_pct']:.1f}%")
+        st.info('Sleep Cycle (read-only) · ' + (' · '.join(details) if details else 'No measurements'))
+    else:
+        st.caption('No Sleep Cycle recording for this date. Manual sleep remains optional below.')
     if existing:
         st.info("A check-in exists for this day. Saving will update it.")
-    st.caption("Quick entry: record a few core measurements, or expand the full check-in.")
+    st.caption("Quick entry: record energy, stress or movement. Imported sleep is not copied to manual entries.")
     with st.form(f"health_quick_{selected_day.isoformat()}"):
         quick = {}
         for key, label in (
-            ("sleep_hours", "Sleep (hours)"),
             ("energy", "Energy (1–10)"),
+            ("stress", "Stress (1–10)"),
             ("movement_minutes", "Movement (minutes)"),
         ):
             bounds = next(field for field in NUMERIC_FIELDS if field[0] == key)
@@ -58,7 +70,7 @@ def daily_screen(db, user_id, today):
         if not quick:
             st.warning("Enter at least one measurement to save.")
         else:
-            service.save(selected_day, {**existing, **quick})
+            service.save(selected_day, manual_checkin_patch(existing, quick))
             st.success("Quick check-in saved.")
             st.rerun()
     with st.expander("Full health check-in", expanded=False):

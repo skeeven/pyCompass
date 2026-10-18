@@ -105,6 +105,16 @@ def full_health_form(service, selected_day, existing):
             )
             if entered is not None:
                 values[key] = entered
+        nutrition_choices = ["Not recorded", "Yes", "No"]
+        saved_nutrition = existing.get("nutrition_on_track")
+        nutrition_choice = st.selectbox(
+            "Did you follow your own nutrition plan today? (optional)",
+            nutrition_choices,
+            index=0 if saved_nutrition is None else (1 if saved_nutrition == 1 else 2),
+            key=f"daily_{selected_day}_nutrition_on_track",
+        )
+        if nutrition_choice != "Not recorded":
+            values["nutrition_on_track"] = 1 if nutrition_choice == "Yes" else 0
         nutrition = st.text_area(
             "Nutrition notes (optional)",
             value=existing.get("nutrition_note", ""), max_chars=2000,

@@ -73,7 +73,7 @@ def daily_screen(db, user_id, today):
             service.save(selected_day, manual_checkin_patch(existing, quick))
             st.success("Quick check-in saved.")
             st.rerun()
-    with st.expander("Full health check-in", expanded=False):
+    with st.expander("Full health check-in (optional manual sleep)", expanded=False):
         full_health_form(service, selected_day, existing)
     if existing:
         with st.expander("Delete this day's health check-in"):
@@ -92,6 +92,8 @@ def full_health_form(service, selected_day, existing):
     with st.form(f"daily_health_{selected_day.isoformat()}"):
         values = {}
         for key, label, minimum, maximum, step in NUMERIC_FIELDS:
+            if key == "sleep_hours":
+                st.caption("Manual sleep is optional; it does not modify your imported Sleep Cycle sessions.")
             existing_value = existing.get(key)
             entered = st.number_input(
                 label + " (leave blank to skip)",

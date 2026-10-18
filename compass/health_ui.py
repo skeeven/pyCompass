@@ -16,6 +16,7 @@ from datetime import date
 from compass.resmed_ocr import recognize_resmed_pdf, parse_resmed_periods
 from compass.sleep_cycle_ocr import recognize_sleep_cycle_pdf
 from compass.sleep_quality_charts import sleep_quality_chart_preview
+from compass.sleep_cycle_csv_ui import csv_import_screen, sleep_cycle_history_screen
 
 PRIORITIES = ["Sleep", "Energy", "Weight", "Nutrition", "Movement", "Stress", "Other"]
 ACTIVITY = ["Prefer not to say", "Mostly seated", "Lightly active", "Moderately active", "Very active"]
@@ -29,8 +30,8 @@ def health_screen(db, user_id):
     step = min(profile["step"], len(ONBOARDING_STEPS) - 1)
 
     st.title("Your Health Journey")
-    dashboard_tab, onboarding_tab, daily_tab, goals_tab, trends_tab, weekly_tab, reports_tab, history_tab = st.tabs(
-        ["Overview", "My health profile", "Daily check-in", "My goals", "Trends", "Weekly review", "Sleep report imports", "Health history"]
+    dashboard_tab, onboarding_tab, daily_tab, goals_tab, trends_tab, weekly_tab, reports_tab, cycle_tab, history_tab = st.tabs(
+        ["Overview", "My health profile", "Daily check-in", "My goals", "Trends", "Weekly review", "Sleep report imports", "Sleep Cycle history", "Health history"]
     )
     with dashboard_tab:
         dashboard_screen(db, user_id, date.today())
@@ -40,6 +41,8 @@ def health_screen(db, user_id):
         onboarding_screen(service, profile, answers, step)
     with history_tab:
         report_history_screen(db, user_id)
+    with cycle_tab:
+        sleep_cycle_history_screen(db, user_id, date.today())
     with daily_tab:
         daily_screen(db, user_id, date.today())
     with goals_tab:
@@ -115,6 +118,21 @@ def report_import_screen(db, user_id):
     st.subheader("Import a sleep report")
     st.caption("ResMed reports use OCR; Sleep Cycle uses embedded text or OCR when necessary. Original PDFs are not saved.")
     kind = st.selectbox("Report source", ["ResMed CPAP", "Sleep Cycle"])
+    if kind == "Sleep Cycle":
+        st.caption("For exact historical scores, choose the CSV database export.")
+        cycle_format = st.radio(
+            "Sleep Cycle export",
+            ["CSV database export (recommended)", "PDF or chart image"],
+            key="cycle_import_format",
+        )
+        if cycle_format == "CSV database export (recommended)":
+            uploaded_csv = st.file_uploader(
+                "Choose the Sleep Cycle CSV file (8 MB maximum)",
+                type=["csv"], key="sleep_cycle_csv_upload",
+            )
+            if uploaded_csv is not None:
+                csv_import_screen(db, user_id, uploaded_csv)
+            return
     chart_mode = False
     if kind == "Sleep Cycle":
         chart_mode = st.radio(

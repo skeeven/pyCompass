@@ -74,6 +74,16 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
     with db.connect() as conn:
         if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
             raise ValueError("Account is unavailable.")
+        duplicate = conn.execute(
+            "SELECT id FROM health_reports WHERE user_id = ? AND report_type = ? "
+            "AND period_start = ? AND period_end = ?",
+            (user_id, kind, start.isoformat(), end.isoformat()),
+        ).fetchone()
+        if duplicate:
+            raise ValueError(
+                "This report source and date range are already saved. "
+                "Delete the existing period in Health history to replace it."
+            )
         report_id = str(uuid4())
         conn.execute(
             """INSERT INTO health_reports

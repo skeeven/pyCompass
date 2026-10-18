@@ -12,6 +12,7 @@ METRICS = {
     "ahi": ("Apnea-hypopnea index", "events/hour"),
     "leak_l_min": ("Mask leak", "L/min"),
     "sleep_hours": ("Sleep duration", "hours/night"),
+    "sleep_quality_pct": ("Sleep quality", "%"),
     "nights_over_four_hours": ("Nights with 4+ hours CPAP", "nights"),
     "nights_over_six_hours": ("Nights with 6+ hours CPAP", "nights"),
 }
@@ -60,7 +61,7 @@ def suggested_metrics(text):
     return values
 
 
-def save_report(db, user_id, filename, kind, start, end, metrics, denominators=None):
+def save_report(db, user_id, filename, kind, start, end, metrics, denominators=None, estimated=False):
     """Save only user-confirmed aggregate metrics and provenance."""
     if kind not in {"ResMed CPAP", "Sleep Cycle"}:
         raise ValueError("Unsupported report type.")
@@ -71,6 +72,9 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
     for key, value in metrics.items():
         if not isinstance(value, (float, int)) or not 0 <= value <= 10000:
             raise ValueError("Invalid metric value.")
+    if "sleep_quality_pct" in metrics:
+        if kind != "Sleep Cycle" or not 0 <= metrics["sleep_quality_pct"] <= 100:
+            raise ValueError("Sleep quality must be a Sleep Cycle percentage from 0 to 100.")
     denominators = denominators or {}
     with db.connect() as conn:
         if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
@@ -101,9 +105,10 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
                 VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (str(uuid4()), report_id, user_id, key, float(value),
                  METRICS[key][1],
-                 ("User verified period aggregate; " +
+                 ("User-estimated chart period average" if estimated and key == "sleep_quality_pct"
+                  else "User verified period aggregate; " +
                   f"{int(value)}/{denominators[key]} nights")
                  if key in denominators and denominators[key] is not None
-                 else "User verified period aggregate"),
+                  else "User verified period aggregate"),
             )
     return report_id

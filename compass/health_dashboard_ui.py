@@ -5,7 +5,7 @@ from datetime import timedelta
 import streamlit as st
 
 from compass.health_dashboard import dashboard_snapshot
-from compass.health_goals import GOAL_OPTIONS, goal_progress
+from compass.health_goals import GOAL_OPTIONS, enriched_goal_progress
 from compass.unified_sleep_ui import unified_sleep_screen
 from compass.health_patterns_ui import personalized_patterns_screen
 from compass.health_report_display import format_report_value
@@ -69,13 +69,25 @@ def dashboard_screen(db, user_id, today):
         logged = DailyHealthService(db, user_id).history(
             start=today - timedelta(days=6), end=today
         )
-        for key, status in goal_progress(logged, configured, today).items():
+        progress = enriched_goal_progress(
+            logged, snapshot["unified_sleep"]["nights"], configured, today, 7
+        )
+        for key, status in progress.items():
             label, unit = GOAL_OPTIONS[key][:2]
-            st.write(
-                f"{label} {status['target']:g} {unit}: "
-                f"{status['met']} of {status['recorded']} measured days met"
-            )
-        st.caption("Unrecorded days are not treated as missed goals.")
+            if key == "weight_lb":
+                latest = status["latest"]
+                value = (f"{latest:.1f} lb toward {status['target']:g} lb"
+                         if latest is not None else "No recent measurements")
+                st.write(f"{label}: {value}")
+            else:
+                st.write(
+                    f"{label} {status['target']:g} {unit}: "
+                    f"{status['met']} of {status['recorded']} measured days met"
+                )
+        st.caption(
+            "Missing observations are not missed goals. Sleep Cycle supplies "
+            "recorded sleep; nutrition reflects only your explicit check-ins."
+        )
 
     reflection = snapshot["reflection"]
     if reflection.get("next_step"):

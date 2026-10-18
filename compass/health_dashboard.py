@@ -8,6 +8,7 @@ from compass.health_history import list_saved_reports
 from compass.health_weekly import WeeklyHealthService
 from compass.sleep_cycle_csv import SleepCycleCSVService
 from compass.sleep_insights import sleep_cycle_insights
+from compass.unified_sleep import unified_sleep_snapshot
 
 
 def dashboard_snapshot(db, user_id, today):
@@ -33,6 +34,9 @@ def dashboard_snapshot(db, user_id, today):
         key=lambda report: (report["period_end"], report["uploaded_at"]),
         reverse=True,
     )
+    cycle_sessions = SleepCycleCSVService(db, user_id).history(
+        start=today - timedelta(days=89), end=today
+    )
     return {
         "latest_checkin": current,
         "weekly": weekly,
@@ -40,9 +44,6 @@ def dashboard_snapshot(db, user_id, today):
         "reflection": weekly_review,
         "latest_report": reports[0] if reports else None,
         "latest_cpap_report": cpap_reports[0] if cpap_reports else None,
-        "sleep_cycle": sleep_cycle_insights(
-            SleepCycleCSVService(db, user_id).history(
-                start=today - timedelta(days=89), end=today
-            ), today,
-        ),
+        "sleep_cycle": sleep_cycle_insights(cycle_sessions, today),
+        "unified_sleep": unified_sleep_snapshot(history, cycle_sessions, reports, today),
     }

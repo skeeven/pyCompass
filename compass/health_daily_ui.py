@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
-from compass.health_daily import DailyHealthService, weekly_summary
+from compass.health_daily import DailyHealthService, weekly_summary, FIELDS
 from compass.unified_daily import UnifiedDailyService
 from compass.health_checkin_context import sleep_context_for_day, manual_checkin_patch
 from compass.health_report_display import format_duration
@@ -35,7 +35,9 @@ def daily_screen(db, user_id, today):
         "Check-in date", value=today, max_value=today,
         key="health_checkin_day",
     )
-    existing = service.get(selected_day)
+    current_values = unified.get(selected_day)["values"]
+    existing = {key: value for key, value in current_values.items()
+                if key in FIELDS}
     imported = sleep_context_for_day(db, user_id, selected_day)
     if imported['session_count']:
         details = []
@@ -118,7 +120,9 @@ def trends_screen(db, user_id, today):
     service = DailyHealthService(db, user_id)
     st.subheader("Your health trends")
     days = st.selectbox("Time window", [7, 14, 30, 90], index=2)
-    records = service.history(start=today - timedelta(days=days - 1), end=today)
+    records = UnifiedDailyService(db, user_id).measurements(
+        start=today - timedelta(days=days - 1), end=today
+    )
     if not records:
         st.info("No check-ins in this period yet. Log a day to see trends.")
         return
@@ -144,7 +148,9 @@ def trends_screen(db, user_id, today):
     with st.expander("Recorded days"):
         st.dataframe(frame, hide_index=True, use_container_width=True)
     review = weekly_summary(
-        service.history(start=today - timedelta(days=6), end=today), today
+        UnifiedDailyService(db, user_id).measurements(
+            start=today - timedelta(days=6), end=today
+        ), today
     )
     st.subheader("Past seven days")
     st.caption(

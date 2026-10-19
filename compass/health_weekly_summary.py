@@ -11,6 +11,7 @@ from compass.health_goals import GOAL_OPTIONS, enriched_goal_progress
 from compass.unified_sleep import unified_sleep_snapshot
 
 MEASURES = {
+    "mood": ("Mood", "/10"),
     "sleep_hours": ("Sleep duration", "hours"),
     "sleep_quality_pct": ("Sleep quality", "%"),
     "energy": ("Energy", "/10"),

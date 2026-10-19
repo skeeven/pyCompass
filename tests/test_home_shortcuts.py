@@ -42,7 +42,7 @@ def test_navigation_buttons_on_every_page(monkeypatch, users):
         ("home_to_Journal", "Journal"),
         ("home_to_Companion", "Companion"),
         ("home_to_Insights", "Insights"),
-        ("home_to_Weekly_reflection", "Weekly reflection"),
+        ("home_to_Weekly_review", "Weekly review"),
     )
     for key, destination in shortcuts:
         app.button(key=key).click().run()

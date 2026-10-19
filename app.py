@@ -280,7 +280,7 @@ def render_navigation():
 render_navigation()
 
 if page == "Health":
-    health_screen(db, repo.user_id)
+    health_screen(db, repo.user_id, today)
 
 elif page == "Today":
     st.title("A moment for you")

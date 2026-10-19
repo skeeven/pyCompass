@@ -49,33 +49,7 @@ def daily_screen(db, user_id, today):
     if existing:
         st.info("A check-in exists for this day. Saving will update it.")
     st.caption("For your everyday mood, energy and stress check-in, use Today. You can also update measurements for earlier dates here.")
-    with st.form(f"health_quick_{selected_day.isoformat()}"):
-        quick = {}
-        for key, label in (
-            ("energy", "Energy (1–10)"),
-            ("stress", "Stress (1–10)"),
-            ("movement_minutes", "Movement (minutes)"),
-        ):
-            bounds = next(field for field in NUMERIC_FIELDS if field[0] == key)
-            value = st.number_input(
-                label + " · optional",
-                min_value=bounds[2],
-                max_value=bounds[3],
-                value=float(existing[key]) if key in existing else None,
-                step=bounds[4],
-                key=f"quick_{selected_day}_{key}",
-            )
-            if value is not None:
-                quick[key] = value
-        quick_save = st.form_submit_button("Save quick check-in")
-    if quick_save:
-        if not quick:
-            st.warning("Enter at least one measurement to save.")
-        else:
-            unified.save_health(selected_day, quick)
-            st.success("Quick check-in saved.")
-            st.rerun()
-    with st.expander("Full health check-in (optional manual sleep)", expanded=False):
+    with st.expander("Additional health measurements", expanded=True):
         full_health_form(unified, selected_day, existing)
     if existing:
         with st.expander("Delete this day's health check-in"):

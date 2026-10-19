@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from compass.health import HealthService
 from compass.health_daily import DailyHealthService, weekly_summary
+from compass.unified_daily import UnifiedDailyService
 from compass.health_history import list_saved_reports
 from compass.health_weekly import WeeklyHealthService
 from compass.sleep_cycle_csv import SleepCycleCSVService
@@ -15,7 +16,7 @@ from compass.health_patterns import personalized_health_insights
 def dashboard_snapshot(db, user_id, today):
     """Only use the authenticated account's data and observed measurements."""
     daily = DailyHealthService(db, user_id)
-    history = daily.history(end=today)
+    history = UnifiedDailyService(db, user_id).measurements(end=today)
     recent = [row for row in history if row["day"] >=
               (today - timedelta(days=6)).isoformat()]
     current = recent[-1] if recent else None

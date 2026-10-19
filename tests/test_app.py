@@ -101,7 +101,7 @@ def test_checkin_journal_navigation_and_logout(monkeypatch, users):
     assert first.rows("journal")[0]["body"] == "I enjoyed a short walk."
     for page in (
         "Insights",
-        "Weekly reflection",
+        "Weekly review",
         "Companion",
         "Privacy & data",
     ):

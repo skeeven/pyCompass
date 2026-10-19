@@ -1,6 +1,7 @@
 """Privacy-first, text-based sleep report PDF intake."""
 
 import io
+import math
 import re
 from datetime import date, datetime, timezone
 from uuid import uuid4
@@ -73,10 +74,12 @@ def save_report(db, user_id, filename, kind, start, end, metrics, denominators=N
         quality = metrics["sleep_quality_pct"]
         if (kind != "Sleep Cycle" or isinstance(quality, bool)
                 or not isinstance(quality, (float, int))
+                or not math.isfinite(quality)
                 or not 0 <= quality <= 100):
             raise ValueError("Sleep quality must be a Sleep Cycle percentage from 0 to 100.")
     for key, value in metrics.items():
-        if not isinstance(value, (float, int)) or not 0 <= value <= 10000:
+        if (isinstance(value, bool) or not isinstance(value, (float, int))
+                or not math.isfinite(value) or not 0 <= value <= 10000):
             raise ValueError("Invalid metric value.")
     denominators = denominators or {}
     with db.connect() as conn:

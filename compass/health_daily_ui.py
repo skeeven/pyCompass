@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from compass.health_daily import DailyHealthService, weekly_summary
+from compass.unified_daily import UnifiedDailyService
 from compass.health_checkin_context import sleep_context_for_day, manual_checkin_patch
 from compass.health_report_display import format_duration
 
@@ -24,7 +25,8 @@ NUMERIC_FIELDS = (
 
 def daily_screen(db, user_id, today):
     service = DailyHealthService(db, user_id)
-    st.subheader("Daily health check-in")
+    unified = UnifiedDailyService(db, user_id)
+    st.subheader("Additional health measurements")
     st.caption(
         "All answers are optional. Empty answers are not counted as zero. "
         "This is personal tracking, not medical advice."
@@ -46,7 +48,7 @@ def daily_screen(db, user_id, today):
         st.caption('No Sleep Cycle recording for this date. Manual sleep remains optional below.')
     if existing:
         st.info("A check-in exists for this day. Saving will update it.")
-    st.caption("Quick entry: record energy, stress or movement. Imported sleep is not copied to manual entries.")
+    st.caption("For your everyday mood, energy and stress check-in, use Today. You can also update measurements for earlier dates here.")
     with st.form(f"health_quick_{selected_day.isoformat()}"):
         quick = {}
         for key, label in (
@@ -70,11 +72,11 @@ def daily_screen(db, user_id, today):
         if not quick:
             st.warning("Enter at least one measurement to save.")
         else:
-            service.save(selected_day, manual_checkin_patch(existing, quick))
+            unified.save_health(selected_day, quick)
             st.success("Quick check-in saved.")
             st.rerun()
     with st.expander("Full health check-in (optional manual sleep)", expanded=False):
-        full_health_form(service, selected_day, existing)
+        full_health_form(unified, selected_day, existing)
     if existing:
         with st.expander("Delete this day's health check-in"):
             if st.checkbox(
@@ -130,7 +132,7 @@ def full_health_form(service, selected_day, existing):
         submitted = st.form_submit_button("Save daily check-in", type="primary")
     if submitted:
         try:
-            service.save(selected_day, values)
+            service.save_health(selected_day, values)
         except ValueError as exc:
             st.error(str(exc))
         else:

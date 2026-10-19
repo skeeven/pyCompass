@@ -1,7 +1,7 @@
 """Run pyCompass with: streamlit run app.py."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -13,6 +13,9 @@ from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
 from compass.health_ui import health_screen
+from compass.health_dashboard import dashboard_snapshot
+from compass.health_goals import GOAL_OPTIONS, enriched_goal_progress
+from compass.health_report_display import format_duration
 from compass.journal import filter_entries
 from compass.observations import read_observation, save_observation
 from compass.recovery import RecoveryService
@@ -290,7 +293,56 @@ elif page == "Today":
     existing = dict(day_values)
     if "sleep_hours" in existing:
         existing["sleep"] = existing["sleep_hours"]
-    st.write("**Quick check-in**")
+    # Start with a concise source-aware status, then offer one daily check-in.
+    home_snapshot = dashboard_snapshot(db, repo.user_id, today)
+    st.subheader("Your day at a glance")
+    sleep_view = home_snapshot["unified_sleep"]
+    last_sleep = sleep_view["latest"]
+    reflection = home_snapshot["reflection"]
+    cols = st.columns(3)
+    with cols[0]:
+        if last_sleep and last_sleep.get("sleep_hours") is not None:
+            st.metric("Latest sleep", format_duration(last_sleep["sleep_hours"]))
+            st.caption(last_sleep["night"] + " · " + last_sleep["sleep_source"])
+        else:
+            st.metric("Latest sleep", "—")
+    with cols[1]:
+        if "energy" in existing:
+            st.metric("Energy", f"{existing['energy']:.0f}/10")
+        else:
+            st.metric("Energy", "—")
+    with cols[2]:
+        if "stress" in existing:
+            st.metric("Stress", f"{existing['stress']:.0f}/10")
+        else:
+            st.metric("Stress", "—")
+    tracked = home_snapshot["profile"]["answers"].get("tracked_goals", {})
+    if tracked:
+        from compass.unified_daily import UnifiedDailyService
+        recent_measurements = UnifiedDailyService(
+            db, repo.user_id
+        ).measurements(start=today - timedelta(days=6), end=today)
+        goal_status = enriched_goal_progress(
+            recent_measurements, sleep_view["nights"], tracked, today
+        )
+        first_key = next(iter(goal_status))
+        first_status = goal_status[first_key]
+        label = GOAL_OPTIONS[first_key][0]
+        if first_key == "weight_lb":
+            latest_weight = first_status["latest"]
+            detail = (f"{latest_weight:.1f} lb recorded" if latest_weight is not None
+                      else "No recent weight measurement")
+        else:
+            detail = (f"{first_status['met']} of {first_status['recorded']} "
+                      "measured days met")
+        st.caption(f"Current goal · {label}: {detail}")
+    else:
+        st.caption("Set a personal goal in Health → My goals to track progress here.")
+    if reflection.get("next_step"):
+        st.info("Your next small step: " + reflection["next_step"])
+    else:
+        st.caption("Your next step will appear here after a weekly health reflection.")
+    st.write("**Today's check-in**")
     if existing:
         st.caption("Saved today · adjust your answers anytime.")
 

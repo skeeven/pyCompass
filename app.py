@@ -289,8 +289,13 @@ elif page == "Today":
     st.title("A moment for you")
     st.caption(today.strftime("%A, %B %d, %Y"))
 
-    day_values = UnifiedDailyService(db, repo.user_id).get(today)["values"]
-    existing = dict(day_values)
+    day_record = UnifiedDailyService(db, repo.user_id).get(today)
+    existing = dict(day_record["values"])
+    if day_record["conflicts"]:
+        st.warning(
+            "Older Today and Health entries disagree on some measurements. "
+            "Health values are shown here; both original records remain saved."
+        )
     if "sleep_hours" in existing:
         existing["sleep"] = existing["sleep_hours"]
     # Start with a concise source-aware status, then offer one daily check-in.

@@ -22,8 +22,9 @@ PRIORITIES = ["Sleep", "Energy", "Weight", "Nutrition", "Movement", "Stress", "O
 ACTIVITY = ["Prefer not to say", "Mostly seated", "Lightly active", "Moderately active", "Very active"]
 
 
-def health_screen(db, user_id):
-    """Render an optional, resumable, user-owned health intake."""
+def health_screen(db, user_id, today=None):
+    """Render account-owned health features in the configured app timezone."""
+    today = today or date.today()
     service = HealthService(db, user_id)
     profile = service.load()
     answers = profile["answers"]
@@ -34,7 +35,7 @@ def health_screen(db, user_id):
         ["Overview", "My health profile", "Daily check-in", "My goals", "Trends", "Weekly review", "Sleep report imports", "Sleep Cycle history", "Health history"]
     )
     with dashboard_tab:
-        dashboard_screen(db, user_id, date.today())
+        dashboard_screen(db, user_id, today)
     with reports_tab:
         report_import_screen(db, user_id)
     with onboarding_tab:
@@ -42,16 +43,16 @@ def health_screen(db, user_id):
     with history_tab:
         report_history_screen(db, user_id)
     with cycle_tab:
-        sleep_cycle_history_screen(db, user_id, date.today())
+        sleep_cycle_history_screen(db, user_id, today)
     with daily_tab:
-        daily_screen(db, user_id, date.today())
+        daily_screen(db, user_id, today)
     with goals_tab:
-        goals_screen(db, user_id, date.today())
+        goals_screen(db, user_id, today)
     with trends_tab:
-        trends_screen(db, user_id, date.today())
-        comparison_screen(db, user_id, date.today())
+        trends_screen(db, user_id, today)
+        comparison_screen(db, user_id, today)
     with weekly_tab:
-        weekly_health_screen(db, user_id, date.today())
+        weekly_health_screen(db, user_id, today)
 
 
 def onboarding_screen(service, profile, answers, step):

@@ -47,9 +47,11 @@ Keep replies concise, usually under 200 words.
 """.strip()
 
 
-def weekly_context(repo, end_day):
-    """Limit context to seven local calendar days and bounded text."""
-    start = end_day - timedelta(days=6)
+def weekly_context(repo, end_day, start_day=None):
+    """Limit context to at most seven local calendar days and bounded text."""
+    start = start_day if start_day is not None else end_day - timedelta(days=6)
+    if not isinstance(start, date) or start > end_day or (end_day - start).days > 6:
+        raise ValueError("Choose an interval of one to seven days.")
     checkins = [
         {
             key: row[key]

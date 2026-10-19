@@ -6,6 +6,7 @@ for shared numeric fields when pre-existing data disagrees.
 """
 
 import json
+import math
 from datetime import date
 
 from compass.health_daily import DailyHealthService
@@ -62,6 +63,11 @@ class UnifiedDailyService:
             legacy = [r for r in legacy if r["day"] <= end.isoformat()]
         return reconcile_daily(legacy, self.health.history(start, end))
 
+    def measurements(self, start=None, end=None):
+        """Legacy-compatible daily rows from the unified source-aware view."""
+        return [{"day": row["day"], **row["values"]}
+                for row in self.history(start, end)]
+
     def get(self, day):
         result = self.history(start=day, end=day)
         return result[0] if result else {
@@ -79,7 +85,8 @@ class UnifiedDailyService:
         if any(isinstance(v, bool) or not isinstance(v, int)
                or not 1 <= v <= 10 for v in (mood, energy, stress)):
             raise ValueError("Ratings must be from 1 to 10.")
-        if isinstance(sleep, bool) or not isinstance(sleep, (float, int)) or not 0 <= sleep <= 24:
+        if (isinstance(sleep, bool) or not isinstance(sleep, (float, int))
+                or not math.isfinite(sleep) or not 0 <= sleep <= 24):
             raise ValueError("Sleep must be between 0 and 24 hours.")
         if not isinstance(note, str) or not isinstance(needs, str):
             raise ValueError("Invalid notes.")

@@ -41,12 +41,17 @@ All changes are limited to `feature/compass-health`. Production is untouched.
   prioritization of cards; this first implementation is intentionally
   small.
 
-### 3. One weekly review — pending
+### 3. One weekly review — committed, local verification pending
 
-After daily unification is verified, bring mental wellness's optional
-AI weekly reflection and Health's metrics/goal reflection onto **one**
-screen, protecting all previously saved free-text reflections and
-requiring explicit AI consent.
+The single **Weekly review** destination displays reconciled mood,
+sleep, energy, stress, movement and goals, plus editable written
+reflections and optional AI assistance. The duplicate Health weekly
+tab is removed. Existing written reviews and saved AI weekly
+reflections remain independently stored and private. The AI context
+is limited to the selected Monday–Sunday calendar interval, and
+includes only original Today check-ins and bounded journal excerpts.
+Imported sleep reports and Health goal information are never added
+to AI requests implicitly.
 
 ### 4. One Insights destination — pending
 

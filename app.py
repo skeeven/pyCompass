@@ -207,7 +207,7 @@ with st.sidebar:
             "Journal",
             "Companion",
             "Insights",
-            "Weekly reflection",
+            "Weekly review",
             "Privacy & data",
             "Account security",
         ],
@@ -263,7 +263,7 @@ def render_navigation():
         (
             ("💬 Companion", "Companion"),
             ("💡 Insights", "Insights"),
-            ("📅 Weekly reflection", "Weekly reflection"),
+            ("📅 Weekly review", "Weekly review"),
         ),
     )
     for group in groups:
@@ -775,7 +775,7 @@ elif page == "Insights":
                     repo.delete("insights", row["id"])
                     st.rerun()
 
-elif page == "Weekly reflection":
+elif page == "Weekly review":
     st.title("A moment to look back")
     end_day = weekly_health_screen(db, repo.user_id, today)
     week_start = end_day - timedelta(days=end_day.weekday())

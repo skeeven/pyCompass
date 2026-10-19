@@ -13,6 +13,7 @@ from compass.checkin import CONTEXTS, EMOTIONS
 from compass.config import Settings
 from compass.db import Database
 from compass.health_ui import health_screen
+from compass.health_weekly_ui import weekly_health_screen
 from compass.health_dashboard import dashboard_snapshot
 from compass.health_goals import GOAL_OPTIONS, enriched_goal_progress
 from compass.health_report_display import format_duration
@@ -776,9 +777,15 @@ elif page == "Insights":
 
 elif page == "Weekly reflection":
     st.title("A moment to look back")
-    end_day = st.date_input("Week ending", today, max_value=today)
-    context = weekly_context(repo, end_day)
-    st.write(local_summary(context))
+    end_day = weekly_health_screen(db, repo.user_id, today)
+    week_start = end_day - timedelta(days=end_day.weekday())
+    st.subheader("Optional AI reflection")
+    context = weekly_context(repo, end_day, start_day=week_start)
+    st.caption(
+        "AI assistance is separate from the measured weekly summary and your "
+        "saved reflection. It uses original Today check-ins and journal excerpts "
+        "only; it does not send Sleep Cycle, ResMed, or Health goal data."
+    )
     consent = ai_consent(
         "weekly_consent",
         "An AI reflection sends this week's check-ins "

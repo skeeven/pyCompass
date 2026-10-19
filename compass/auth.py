@@ -35,7 +35,14 @@ def verify_password(password, encoded):
     """Compare a candidate password in constant time."""
     try:
         algorithm, iterations, salt, expected = encoded.split("$")
-        if algorithm != "pbkdf2_sha256":
+        # Reject malformed/untrusted stored hashes before expensive work.
+        # The current application only issues hashes with this work factor.
+        if (algorithm != "pbkdf2_sha256"
+                or iterations != str(ITERATIONS)
+                or not re.fullmatch(r"[0-9a-f]{32}", salt)
+                or not re.fullmatch(r"[0-9a-f]{64}", expected)
+                or not isinstance(password, str)
+                or len(password) > 256):
             return False
         actual = hashlib.pbkdf2_hmac(
             "sha256", password.encode(), salt.encode(), int(iterations)

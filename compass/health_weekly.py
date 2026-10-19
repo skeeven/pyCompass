@@ -4,6 +4,7 @@ import json
 from datetime import date, timedelta
 
 from compass.health_daily import DailyHealthService, weekly_summary
+from compass.unified_daily import UnifiedDailyService
 from compass.health_history import list_saved_reports
 from compass.health import HealthService
 from compass.sleep_cycle_csv import SleepCycleCSVService
@@ -33,7 +34,7 @@ class WeeklyHealthService:
             end = today
         if end < start:
             raise ValueError("Week hasn't started.")
-        rows = self.daily.history(start, end)
+        rows = UnifiedDailyService(self.db, self.user_id).measurements(start, end)
         summary = weekly_summary(rows, end) if (end - start).days == 6 else {
             "start": start, "end": end, "days_logged": len(rows),
             "averages": {
@@ -66,7 +67,9 @@ class WeeklyHealthService:
             raise ValueError("Week hasn't started.")
         end = min(end, limit)
         previous_start = start - timedelta(days=7)
-        manual = self.daily.history(start=previous_start, end=end)
+        manual = UnifiedDailyService(self.db, self.user_id).measurements(
+            start=previous_start, end=end
+        )
         sessions = SleepCycleCSVService(self.db, self.user_id).history(
             start=previous_start, end=end
         )

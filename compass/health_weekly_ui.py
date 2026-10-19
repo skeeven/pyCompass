@@ -10,7 +10,7 @@ from compass.health_report_display import format_duration
 
 def weekly_health_screen(db, user_id, today):
     service = WeeklyHealthService(db, user_id)
-    st.subheader("Weekly health review")
+    st.subheader("Your weekly review")
     selected = st.date_input(
         "Review a week containing", today, max_value=today,
         key="health_weekly_date",
@@ -135,3 +135,4 @@ def weekly_health_screen(db, user_id, today):
         "treatment recommendations. The numeric summary updates if you edit "
         "past check-ins; your written reflection stays as you saved it."
     )
+    return min(end, today)

@@ -5,6 +5,7 @@ import streamlit as st
 from compass.health import HealthService
 from compass.health_goals import GOAL_OPTIONS, enriched_goal_progress, compare_weeks
 from compass.health_daily import DailyHealthService
+from compass.unified_daily import UnifiedDailyService
 from compass.sleep_cycle_csv import SleepCycleCSVService
 from compass.unified_sleep import unified_sleep_snapshot
 from datetime import timedelta
@@ -53,7 +54,7 @@ def goals_screen(db, user_id, today):
     if not saved:
         st.info("Select and save a goal to see its progress here.")
         return
-    rows = DailyHealthService(db, user_id).history(
+    rows = UnifiedDailyService(db, user_id).measurements(
         start=today - timedelta(days=29), end=today
     )
     cycle = SleepCycleCSVService(db, user_id).history(
@@ -108,7 +109,7 @@ def goals_screen(db, user_id, today):
 
 def comparison_screen(db, user_id, today):
     st.subheader("Two-week comparison")
-    rows = DailyHealthService(db, user_id).history()
+    rows = UnifiedDailyService(db, user_id).measurements()
     data = compare_weeks(rows, today)
     st.caption(
         f"Current: {data['current']['start']:%b %d}–"

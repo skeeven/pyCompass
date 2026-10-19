@@ -25,6 +25,7 @@ from compass.reflection import (
     weekly_context,
 )
 from compass.repository import Repository
+from compass.unified_daily import UnifiedDailyService
 from compass.session import check_session, start_session
 from compass.trends import RATINGS, trend_summary
 
@@ -285,10 +286,10 @@ elif page == "Today":
     st.title("A moment for you")
     st.caption(today.strftime("%A, %B %d, %Y"))
 
-    existing = next(
-        (row for row in repo.rows("checkins") if row["day"] == today.isoformat()),
-        {},
-    )
+    day_values = UnifiedDailyService(db, repo.user_id).get(today)["values"]
+    existing = dict(day_values)
+    if "sleep_hours" in existing:
+        existing["sleep"] = existing["sleep_hours"]
     st.write("**Quick check-in**")
     if existing:
         st.caption("Saved today · adjust your answers anytime.")
@@ -351,8 +352,8 @@ elif page == "Today":
         if st.form_submit_button(
             "Save check-in", type="primary", use_container_width=True
         ):
-            repo.save_checkin(
-                today.isoformat(), mood, energy, stress, sleep, note,
+            UnifiedDailyService(db, repo.user_id).save_today(
+                today, mood, energy, stress, sleep, note,
                 emotions=emotions, contexts=contexts, needs=needs,
                 activity_done=activity_done,
             )

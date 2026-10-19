@@ -75,7 +75,7 @@ def test_weekly_deletion_requires_confirmation(monkeypatch, users):
     app = open_app(monkeypatch, first.db)
     app.session_state["user_id"] = first.user_id
     app.run()
-    app.radio[0].set_value("Weekly reflection").run()
+    app.radio[0].set_value("Weekly review").run()
     assert not app.exception
     assert app.button(key=f"week_{row['id']}").disabled
     assert len(first.rows("insights")) == 1

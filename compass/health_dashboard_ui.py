@@ -5,6 +5,7 @@ from datetime import timedelta
 import streamlit as st
 
 from compass.health_dashboard import dashboard_snapshot
+from compass.unified_daily import UnifiedDailyService
 from compass.health_goals import GOAL_OPTIONS, enriched_goal_progress
 from compass.unified_sleep_ui import unified_sleep_screen
 from compass.health_patterns_ui import personalized_patterns_screen
@@ -66,7 +67,7 @@ def dashboard_screen(db, user_id, today):
     if configured:
         st.subheader("Daily goal progress")
         from compass.health_daily import DailyHealthService
-        logged = DailyHealthService(db, user_id).history(
+        logged = UnifiedDailyService(db, user_id).measurements(
             start=today - timedelta(days=6), end=today
         )
         progress = enriched_goal_progress(
@@ -101,7 +102,7 @@ def dashboard_screen(db, user_id, today):
 
     st.subheader("Other daily measurements")
     from compass.health_daily import DailyHealthService
-    history = DailyHealthService(db, user_id).history(
+    history = UnifiedDailyService(db, user_id).measurements(
         start=today - timedelta(days=6), end=today
     )
     available = [
